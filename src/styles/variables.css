@@ -1,0 +1,47 @@
+/* Deadbeat® Studio - Master Design System & Theme Engine */
+
+body[data-theme="dark"] {
+  --bg-primary: #050505;
+  --bg-secondary: #0b0b0b;
+  --bg-card: #111111;
+  --bg-card-solid: #111111;
+  --bg-input: #161616;
+  --text-primary: #ffffff;
+  --text-secondary: #999999;
+  --text-muted: #666666;
+  --border-dark: rgba(255, 255, 255, 0.12);
+  --border-light: rgba(255, 255, 255, 0.08);
+  --nav-bg: rgba(5, 5, 5, 0.85);
+  --modal-bg: #111111;
+  --shadow-card: 0 15px 35px rgba(0, 0, 0, 0.5);
+  --sun-display: flex;
+  --moon-display: none;
+}
+
+body[data-theme="light"] {
+  --bg-primary: #f8f9fa;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-solid: #ffffff;
+  --bg-input: #f1f3f5;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --border-dark: rgba(0, 0, 0, 0.12);
+  --border-light: rgba(0, 0, 0, 0.08);
+  --nav-bg: rgba(255, 255, 255, 0.9);
+  --modal-bg: #ffffff;
+  --shadow-card: 0 10px 30px rgba(0, 0, 0, 0.06);
+  --sun-display: none;
+  --moon-display: flex;
+}
+
+:root {
+  --font-serif: 'Instrument Serif', Georgia, serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Space Mono', monospace;
+  --transition-smooth: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+}
