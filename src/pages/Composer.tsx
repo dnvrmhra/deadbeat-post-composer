@@ -2,7 +2,8 @@ import { useEffect, type ChangeEvent } from "react";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import {
   setEditorContent,
-  setEditorImage,
+  addEditorImage,
+  removeEditorImage,
   setEditorPlatform,
   clearEditor,
   loadDrafts,
@@ -30,11 +31,11 @@ function Composer() {
     dispatch(loadDrafts());
   }, [dispatch]);
 
-  const { platform, content, image, editing, editingId } = useAppSelector(
+  const { platform, content, images = [], editing, editingId } = useAppSelector(
     (state) => state.posts.editor
   );
 
-  const validation = validatePost(platform, content, image);
+  const validation = validatePost(platform, content, images);
 
   function handleSave(): void {
     if (!validation.valid) return;
@@ -42,7 +43,8 @@ function Composer() {
     const basePayload = {
       platform,
       content,
-      image,
+      images,
+      image: images[0], // fallback for single image compatibility
       date: new Date().toLocaleString(),
     };
 
@@ -91,8 +93,9 @@ function Composer() {
           </div>
 
           <ImageUploader
-            image={image}
-            setImage={(img) => dispatch(setEditorImage(img))}
+            images={images}
+            onAdd={(img) => dispatch(addEditorImage(img))}
+            onRemove={(index) => dispatch(removeEditorImage(index))}
           />
 
           <CharacterCounter platform={platform} count={content.length} />
@@ -121,7 +124,7 @@ function Composer() {
             </span>
           </div>
 
-          <SocialPreview platform={platform} content={content} image={image} />
+          <SocialPreview platform={platform} content={content} images={images} />
         </div>
       </div>
     </div>

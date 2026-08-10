@@ -36,20 +36,23 @@ const EventCard: React.FC<EventCardProps> = React.memo(({ event, onClick, onDrag
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "5px",
-          padding: "3px 7px",
-          marginBottom: "3px",
-          borderRadius: "4px",
-          background: `${accent}18`,
+          gap: "6px",
+          padding: "4px 8px",
+          marginBottom: "4px",
+          borderRadius: "6px",
+          background: `${accent}15`,
           borderLeft: `3px solid ${accent}`,
+          borderTop: "1px solid rgba(150,150,150,0.08)",
+          borderRight: "1px solid rgba(150,150,150,0.08)",
+          borderBottom: "1px solid rgba(150,150,150,0.08)",
           cursor: "pointer",
-          transition: "opacity 0.15s",
+          transition: "all 0.15s ease",
           overflow: "hidden",
         }}
       >
-        <PlatformLogo platform={event.platform} size={10} />
+        <PlatformLogo platform={event.platform} size={11} />
         <span style={{
-          fontSize: "0.72rem",
+          fontSize: "0.73rem",
           fontWeight: 600,
           color: "var(--text-primary)",
           whiteSpace: "nowrap",
@@ -57,8 +60,13 @@ const EventCard: React.FC<EventCardProps> = React.memo(({ event, onClick, onDrag
           textOverflow: "ellipsis",
           flex: 1,
         }}>
-          {event.time ? event.time.replace(/ (AM|PM)/, (m) => m) + " " : ""}{event.title}
+          {event.time ? event.time.replace(/ (AM|PM)/, "") + " " : ""}{event.title}
         </span>
+        {event.image && (
+          <span style={{ fontSize: "0.65rem", opacity: 0.7 }} title="Has media attachment">
+            🖼️
+          </span>
+        )}
       </div>
     );
   }
@@ -70,23 +78,24 @@ const EventCard: React.FC<EventCardProps> = React.memo(({ event, onClick, onDrag
       onDragStart={(e) => onDragStart && onDragStart(e, event)}
       onClick={() => onClick && onClick(event)}
       style={{
-        padding: "12px 14px",
-        marginBottom: "8px",
+        padding: "14px 16px",
+        marginBottom: "10px",
         background: "var(--bg-card)",
         border: "1px solid var(--border-dark)",
-        borderLeft: `3px solid ${accent}`,
-        borderRadius: "var(--radius-sm)",
+        borderLeft: `4px solid ${accent}`,
+        borderRadius: "10px",
         cursor: "pointer",
         transition: "transform 0.15s ease, box-shadow 0.15s ease",
         display: "flex",
         flexDirection: "column",
-        gap: "8px",
+        gap: "10px",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <PlatformLogo platform={event.platform} size={13} />
-          <span style={{ fontSize: "0.78rem", fontWeight: 700, color: accent, letterSpacing: "0.02em" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+          <PlatformLogo platform={event.platform} size={14} />
+          <span style={{ fontSize: "0.8rem", fontWeight: 700, color: accent, letterSpacing: "0.02em" }}>
             {event.platform}
           </span>
         </div>
@@ -94,9 +103,9 @@ const EventCard: React.FC<EventCardProps> = React.memo(({ event, onClick, onDrag
           <span style={{
             display: "flex",
             alignItems: "center",
-            gap: "4px",
+            gap: "5px",
             fontSize: "0.68rem",
-            padding: "2px 8px",
+            padding: "3px 9px",
             borderRadius: "20px",
             background: statusCfg.bg,
             color: statusCfg.text,
@@ -104,48 +113,68 @@ const EventCard: React.FC<EventCardProps> = React.memo(({ event, onClick, onDrag
             textTransform: "uppercase",
             letterSpacing: "0.06em",
           }}>
-            <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: statusCfg.dot, display: "inline-block" }} />
+            <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: statusCfg.dot, display: "inline-block" }} />
             {event.status}
           </span>
         )}
       </div>
 
-      <div style={{
-        fontSize: "0.88rem",
-        fontWeight: 600,
-        color: "var(--text-primary)",
-        lineHeight: 1.35,
-        overflow: "hidden",
-        display: "-webkit-box",
-        WebkitLineClamp: 2,
-        WebkitBoxOrient: "vertical",
-      }}>
-        {event.title}
+      <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+        {event.image && (
+          <img
+            src={event.image}
+            alt="thumbnail"
+            style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "6px",
+              objectFit: "cover",
+              flexShrink: 0,
+              border: "1px solid var(--border-dark)",
+            }}
+          />
+        )}
+        <div style={{
+          fontSize: "0.9rem",
+          fontWeight: 600,
+          color: "var(--text-primary)",
+          lineHeight: 1.4,
+          overflow: "hidden",
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          flex: 1,
+        }}>
+          {event.title}
+        </div>
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
-        <span style={{ fontSize: "0.73rem", color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
-          {event.date}
+        <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
+          🗓️ {event.date}
         </span>
         <span style={{
-          fontSize: "0.73rem",
+          fontSize: "0.75rem",
           color: accent,
           fontWeight: 700,
           fontFamily: "var(--font-mono)",
         }}>
-          {event.time || "All day"}
+          ⏰ {event.time || "All day"}
         </span>
       </div>
 
       <div style={{
-        fontSize: "0.65rem",
+        fontSize: "0.68rem",
         color: "var(--text-muted)",
         fontFamily: "var(--font-mono)",
-        borderTop: "1px solid var(--border-light)",
+        borderTop: "1px solid var(--border-dark)",
         paddingTop: "6px",
         letterSpacing: "0.04em",
+        display: "flex",
+        justifyContent: "space-between",
       }}>
-        ID: {event.id}
+        <span>ID: {event.id}</span>
+        <span style={{ color: "var(--text-secondary)" }}>Drag to reschedule ↕</span>
       </div>
     </div>
   );

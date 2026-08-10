@@ -2,14 +2,17 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import DeadbeatCursor from "../components/DeadbeatCursor";
+import SocialPreview from "../components/SocialPreview";
 import { TwitterIcon, InstagramIcon, LinkedinIcon, FacebookIcon } from "../components/SocialIcons";
 
 function Home() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [studioPlatform, setStudioPlatform] = useState<"Twitter" | "Instagram" | "LinkedIn" | "Facebook">("Twitter");
-  const [studioContent, setStudioContent] = useState<string>("Wagwan");
+  const [studioContent, setStudioContent] = useState<string>("Launching the next-gen Deadbeat® composer with live multi-channel previews.");
   const [timeString, setTimeString] = useState("");
+
+  const sampleImages = ["/avatar.jpg"];
 
   const handleComposeClick = () => {
     if (user?.role === "Viewer") {
@@ -329,8 +332,8 @@ function Home() {
             </p>
           </div>
 
-          <div className="playground-canvas-wrapper">
-            <div className="lab-controls">
+          <div className="playground-canvas-wrapper" style={{ maxWidth: "680px", margin: "0 auto" }}>
+            <div className="lab-controls" style={{ marginBottom: "20px" }}>
               <button
                 className={`lab-btn ${studioPlatform === "Twitter" ? "active" : ""}`}
                 onClick={() => setStudioPlatform("Twitter")}
@@ -357,48 +360,29 @@ function Home() {
               </button>
             </div>
 
-            <div className="social-mock-post" style={{ background: "var(--bg-secondary)", borderRadius: "10px", padding: "24px", border: "1px solid var(--border-dark)" }}>
-              <div className="mock-post-user" style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-                <div style={{
-                  width: "42px",
-                  height: "42px",
-                  borderRadius: "50%",
-                  overflow: "hidden",
-                  flexShrink: 0,
-                }}>
-                  <img
-                    src="/avatar.jpg"
-                    alt="profile"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      objectPosition: "center 38%",
-                      display: "block",
-                    }}
-                  />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--text-primary)" }}>
-                    Deadbeat® Official
-                  </div>
-                  <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                    @deadbeat_studio • Live Preview
-                  </div>
-                </div>
-              </div>
-
+            <div style={{ marginBottom: "16px" }}>
               <textarea
                 value={studioContent}
                 onChange={(e) => setStudioContent(e.target.value)}
-                style={{ width: "100%", height: "90px", fontSize: "0.95rem", marginBottom: "14px" }}
+                placeholder="Type here to test live preview..."
+                style={{
+                  width: "100%",
+                  height: "70px",
+                  fontSize: "0.95rem",
+                  padding: "12px 14px",
+                  borderRadius: "8px",
+                  background: "var(--bg-secondary)",
+                  border: "1px solid var(--border-dark)",
+                  color: "var(--text-primary)",
+                }}
               />
-
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "var(--text-secondary)", paddingTop: "10px", borderTop: "1px solid var(--border-dark)" }}>
-                <span>Channel: <strong>{studioPlatform}</strong></span>
-                <span>Length: {studioContent.length} chars</span>
-              </div>
             </div>
+
+            <SocialPreview
+              platform={studioPlatform}
+              content={studioContent}
+              images={sampleImages}
+            />
           </div>
         </div>
       </section>

@@ -18,7 +18,7 @@ export function runValidationTests() {
     throw new Error("Instagram image requirement test failed");
   }
 
-  const validInstagram = validatePost("Instagram", "Caption with image", "data:image/png;base64,sample");
+  const validInstagram = validatePost("Instagram", "Caption with image", ["data:image/png;base64,sample"]);
   if (!validInstagram.valid) {
     throw new Error("Instagram with image test failed");
   }

@@ -133,7 +133,23 @@ function getStoredDrafts(): Post[] {
 }
 
 function saveStoredDrafts(drafts: Post[]): void {
-  localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
+  try {
+    localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
+  } catch (e) {
+    console.warn("Storage quota limit reached, attempting fallback optimization...", e);
+    // Fallback: trim older heavy image data if localStorage is full
+    const safeDrafts = drafts.map((d, i) => {
+      if (i < drafts.length - 3 && d.images && d.images.length > 1) {
+        return { ...d, images: [d.images[0]] };
+      }
+      return d;
+    });
+    try {
+      localStorage.setItem(DRAFTS_KEY, JSON.stringify(safeDrafts));
+    } catch (err) {
+      console.error("Critical storage failure:", err);
+    }
+  }
 }
 
 export const mockApi = {

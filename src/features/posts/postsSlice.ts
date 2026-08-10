@@ -6,6 +6,7 @@ export interface Post {
   id: string;
   platform: string;
   content: string;
+  images?: string[];
   image?: string;
   date: string;
 }
@@ -17,7 +18,7 @@ export interface ValidationResult {
 
 export interface EditorState {
   content: string;
-  image?: string;
+  images: string[];
   platform: string;
   editing: boolean;
   editingId?: string;
@@ -35,7 +36,7 @@ const initialState: PostsState = {
   posts: postsAdapter.getInitialState(),
   editor: {
     content: '',
-    image: undefined,
+    images: [],
     platform: 'Twitter',
     editing: false,
     editingId: undefined,
@@ -72,19 +73,33 @@ const postsSlice = createSlice({
     setEditorContent(state, action: PayloadAction<string>) {
       state.editor.content = action.payload;
     },
-    setEditorImage(state, action: PayloadAction<string | undefined>) {
-      state.editor.image = action.payload;
+    setEditorImages(state, action: PayloadAction<string[]>) {
+      state.editor.images = action.payload;
+    },
+    addEditorImage(state, action: PayloadAction<string>) {
+      state.editor.images = [...state.editor.images, action.payload];
+    },
+    removeEditorImage(state, action: PayloadAction<number>) {
+      state.editor.images = state.editor.images.filter((_, i) => i !== action.payload);
     },
     setEditorPlatform(state, action: PayloadAction<string>) {
       state.editor.platform = action.payload;
     },
-    setEditing(state, action: PayloadAction<string>) {
-      const id = action.payload;
-      const draft = state.posts.entities[id];
+    setEditing(state, action: PayloadAction<string | Post>) {
+      const payload = action.payload;
+      const id = typeof payload === 'string' ? payload : payload.id;
+      const draft = typeof payload === 'string' ? state.posts.entities[id] : payload;
+
       if (draft) {
+        const imgs = draft.images && draft.images.length > 0
+          ? draft.images
+          : draft.image
+          ? [draft.image]
+          : [];
+
         state.editor = {
           content: draft.content,
-          image: draft.image,
+          images: imgs,
           platform: draft.platform,
           editing: true,
           editingId: id,
@@ -94,7 +109,7 @@ const postsSlice = createSlice({
     clearEditor(state) {
       state.editor = {
         content: '',
-        image: undefined,
+        images: [],
         platform: 'Twitter',
         editing: false,
         editingId: undefined,
@@ -121,8 +136,8 @@ const postsSlice = createSlice({
       postsAdapter.addOne(state.posts, action.payload);
     });
     builder.addCase(updateDraft.fulfilled, (state, action) => {
-      const { id, ...changes } = action.payload;
-      postsAdapter.updateOne(state.posts, { id, changes });
+      const updated = action.payload;
+      postsAdapter.upsertOne(state.posts, updated);
     });
     builder.addCase(deleteDraft.fulfilled, (state, action) => {
       postsAdapter.removeOne(state.posts, action.payload);
@@ -132,7 +147,9 @@ const postsSlice = createSlice({
 
 export const {
   setEditorContent,
-  setEditorImage,
+  setEditorImages,
+  addEditorImage,
+  removeEditorImage,
   setEditorPlatform,
   setEditing,
   clearEditor,

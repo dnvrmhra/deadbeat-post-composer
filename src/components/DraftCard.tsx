@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppDispatch } from "../app/hooks";
 import { deleteDraft, setEditing } from "../features/posts/postsSlice";
@@ -15,9 +15,16 @@ function DraftCard({ draft }: DraftCardProps) {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { user } = useAuth();
+  const [activeImgIndex, setActiveImgIndex] = useState(0);
 
   const canEdit = user?.role === "Admin" || user?.role === "Editor";
   const canDelete = user?.role === "Admin";
+
+  const allImages = draft.images && draft.images.length > 0
+    ? draft.images
+    : draft.image
+    ? [draft.image]
+    : [];
 
   function handleDelete(): void {
     if (!canDelete) return;
@@ -30,7 +37,7 @@ function DraftCard({ draft }: DraftCardProps) {
 
   function handleEdit(): void {
     if (!canEdit) return;
-    dispatch(setEditing(draft.id));
+    dispatch(setEditing(draft));
     navigate("/compose");
   }
 
@@ -44,12 +51,42 @@ function DraftCard({ draft }: DraftCardProps) {
         <span>{draft.date}</span>
       </div>
 
-      {draft.image && (
-        <img
-          src={draft.image}
-          alt="Draft"
-          className="draft-image"
-        />
+      {allImages.length > 0 && (
+        <div style={{ position: "relative", width: "100%", borderRadius: "8px", overflow: "hidden", marginBottom: "12px" }}>
+          <img
+            src={allImages[activeImgIndex]}
+            alt={`Draft ${activeImgIndex + 1}`}
+            className="draft-image"
+            style={{ width: "100%", maxHeight: "220px", objectFit: "cover", display: "block" }}
+          />
+
+          {allImages.length > 1 && (
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); setActiveImgIndex((i) => (i - 1 + allImages.length) % allImages.length); }}
+                style={{
+                  position: "absolute", left: "6px", top: "50%", transform: "translateY(-50%)",
+                  background: "rgba(0,0,0,0.6)", color: "#fff", border: "none", borderRadius: "50%",
+                  width: "24px", height: "24px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >‹</button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setActiveImgIndex((i) => (i + 1) % allImages.length); }}
+                style={{
+                  position: "absolute", right: "6px", top: "50%", transform: "translateY(-50%)",
+                  background: "rgba(0,0,0,0.6)", color: "#fff", border: "none", borderRadius: "50%",
+                  width: "24px", height: "24px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >›</button>
+              <span style={{
+                position: "absolute", top: "6px", right: "8px", background: "rgba(0,0,0,0.75)",
+                color: "#fff", fontSize: "0.7rem", fontWeight: 700, padding: "2px 7px", borderRadius: "10px",
+              }}>
+                {activeImgIndex + 1} / {allImages.length}
+              </span>
+            </>
+          )}
+        </div>
       )}
 
       <p>{draft.content}</p>

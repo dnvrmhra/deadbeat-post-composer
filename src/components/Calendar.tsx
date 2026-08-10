@@ -65,20 +65,26 @@ const Calendar: React.FC<Props> = React.memo(({ events, onEventClick, onDateClic
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const prevMonthDays = new Date(year, month, 0).getDate();
 
-    const cells: { dateStr: string; day: number; current: boolean; today: boolean }[] = [];
+    const cells: { dateStr: string; day: number; current: boolean; today: boolean; isWeekend: boolean }[] = [];
 
     for (let i = firstDay - 1; i >= 0; i--) {
       const d = prevMonthDays - i;
-      cells.push({ dateStr: toDateStr(new Date(year, month - 1, d)), day: d, current: false, today: false });
+      const date = new Date(year, month - 1, d);
+      const dayOfWeek = date.getDay();
+      cells.push({ dateStr: toDateStr(date), day: d, current: false, today: false, isWeekend: dayOfWeek === 0 || dayOfWeek === 6 });
     }
     for (let d = 1; d <= daysInMonth; d++) {
-      const ds = toDateStr(new Date(year, month, d));
-      cells.push({ dateStr: ds, day: d, current: true, today: ds === TODAY_STR });
+      const date = new Date(year, month, d);
+      const ds = toDateStr(date);
+      const dayOfWeek = date.getDay();
+      cells.push({ dateStr: ds, day: d, current: true, today: ds === TODAY_STR, isWeekend: dayOfWeek === 0 || dayOfWeek === 6 });
     }
     const totalCells = cells.length > 35 ? 42 : 35;
     let n = 1;
     while (cells.length < totalCells) {
-      cells.push({ dateStr: toDateStr(new Date(year, month + 1, n)), day: n, current: false, today: false });
+      const date = new Date(year, month + 1, n);
+      const dayOfWeek = date.getDay();
+      cells.push({ dateStr: toDateStr(date), day: n, current: false, today: false, isWeekend: dayOfWeek === 0 || dayOfWeek === 6 });
       n++;
     }
     return cells;
@@ -91,7 +97,7 @@ const Calendar: React.FC<Props> = React.memo(({ events, onEventClick, onDateClic
       const day = new Date(d);
       day.setDate(d.getDate() + i);
       const ds = toDateStr(day);
-      return { dateStr: ds, dayOfWeek: DAYS_FULL[day.getDay()], dayNum: day.getDate(), today: ds === TODAY_STR };
+      return { dateStr: ds, dayOfWeek: DAYS_FULL[day.getDay()], dayNum: day.getDate(), today: ds === TODAY_STR, isWeekend: i === 0 || i === 6 };
     });
   }, [currentDate]);
 
@@ -134,72 +140,78 @@ const Calendar: React.FC<Props> = React.memo(({ events, onEventClick, onDateClic
         alignItems: "center",
         justifyContent: "space-between",
         flexWrap: "wrap",
-        gap: "12px",
+        gap: "14px",
         marginBottom: "20px",
+        background: "var(--bg-card)",
+        padding: "16px 20px",
+        borderRadius: "12px",
+        border: "1px solid var(--border-dark)",
+        boxShadow: "0 4px 14px rgba(0,0,0,0.03)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-          <h2 style={{ margin: 0, fontSize: "1.35rem", fontWeight: 700, letterSpacing: "-0.01em", color: "var(--text-primary)" }}>
+          <h2 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 800, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>
             {periodLabel}
           </h2>
           {totalToday > 0 && viewMode === "month" && (
             <span style={{
-              fontSize: "0.72rem",
+              fontSize: "0.74rem",
               fontWeight: 700,
-              padding: "3px 10px",
+              padding: "3px 12px",
               borderRadius: "20px",
               background: "rgba(59,130,246,0.12)",
               color: "#3b82f6",
-              border: "1px solid rgba(59,130,246,0.2)",
+              border: "1px solid rgba(59,130,246,0.25)",
             }}>
-              {totalToday} today
+              {totalToday} post{totalToday !== 1 ? "s" : ""} today
             </span>
           )}
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
           <button
             onClick={goToToday}
             style={{
-              padding: "6px 14px",
-              fontSize: "0.82rem",
-              fontWeight: 600,
-              background: "transparent",
+              padding: "7px 16px",
+              fontSize: "0.85rem",
+              fontWeight: 700,
+              background: "rgba(150,150,150,0.08)",
               border: "1px solid var(--border-dark)",
-              borderRadius: "6px",
+              borderRadius: "8px",
               color: "var(--text-primary)",
               cursor: "pointer",
               letterSpacing: "0.02em",
+              transition: "all 0.15s ease",
             }}
           >
             Today
           </button>
 
-          <div style={{ display: "flex", border: "1px solid var(--border-dark)", borderRadius: "6px", overflow: "hidden" }}>
-            <button onClick={prevPeriod} style={{ padding: "6px 12px", background: "var(--bg-card)", border: "none", borderRight: "1px solid var(--border-dark)", color: "var(--text-primary)", cursor: "pointer", fontSize: "0.95rem", fontWeight: 700 }}>
+          <div style={{ display: "flex", border: "1px solid var(--border-dark)", borderRadius: "8px", overflow: "hidden", background: "var(--bg-secondary)" }}>
+            <button onClick={prevPeriod} title="Previous" style={{ padding: "6px 14px", background: "transparent", border: "none", borderRight: "1px solid var(--border-dark)", color: "var(--text-primary)", cursor: "pointer", fontSize: "1.1rem", fontWeight: 700 }}>
               ‹
             </button>
-            <button onClick={nextPeriod} style={{ padding: "6px 12px", background: "var(--bg-card)", border: "none", color: "var(--text-primary)", cursor: "pointer", fontSize: "0.95rem", fontWeight: 700 }}>
+            <button onClick={nextPeriod} title="Next" style={{ padding: "6px 14px", background: "transparent", border: "none", color: "var(--text-primary)", cursor: "pointer", fontSize: "1.1rem", fontWeight: 700 }}>
               ›
             </button>
           </div>
 
-          <div style={{ display: "flex", background: "var(--bg-card)", border: "1px solid var(--border-dark)", borderRadius: "6px", padding: "3px", gap: "2px" }}>
+          <div style={{ display: "flex", background: "var(--bg-secondary)", border: "1px solid var(--border-dark)", borderRadius: "8px", padding: "3px", gap: "3px" }}>
             {(["month", "week", "day"] as ViewMode[]).map((m) => (
               <button
                 key={m}
                 onClick={() => setViewMode(m)}
                 style={{
-                  padding: "5px 14px",
-                  fontSize: "0.8rem",
+                  padding: "6px 16px",
+                  fontSize: "0.82rem",
                   fontWeight: 700,
                   border: "none",
-                  borderRadius: "4px",
+                  borderRadius: "6px",
                   cursor: "pointer",
                   letterSpacing: "0.02em",
                   textTransform: "capitalize",
                   background: viewMode === m ? "var(--text-primary)" : "transparent",
                   color: viewMode === m ? "var(--bg-primary)" : "var(--text-secondary)",
-                  transition: "background 0.18s, color 0.18s",
+                  transition: "all 0.18s ease",
                 }}
               >
                 {m}
@@ -212,9 +224,10 @@ const Calendar: React.FC<Props> = React.memo(({ events, onEventClick, onDateClic
       {viewMode === "month" && (
         <div style={{
           border: "1px solid var(--border-dark)",
-          borderRadius: "12px",
+          borderRadius: "14px",
           overflow: "hidden",
           background: "var(--bg-card)",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
         }}>
           <div style={{
             display: "grid",
@@ -222,15 +235,15 @@ const Calendar: React.FC<Props> = React.memo(({ events, onEventClick, onDateClic
             background: "var(--bg-secondary)",
             borderBottom: "1px solid var(--border-dark)",
           }}>
-            {DAYS_SHORT.map((d) => (
+            {DAYS_SHORT.map((d, i) => (
               <div key={d} style={{
-                padding: "10px 0",
+                padding: "12px 0",
                 textAlign: "center",
-                fontSize: "0.75rem",
-                fontWeight: 700,
+                fontSize: "0.78rem",
+                fontWeight: 800,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                color: "var(--text-secondary)",
+                color: i === 0 || i === 6 ? "var(--text-muted)" : "var(--text-secondary)",
               }}>
                 {d}
               </div>
@@ -249,18 +262,20 @@ const Calendar: React.FC<Props> = React.memo(({ events, onEventClick, onDateClic
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, cell.dateStr)}
                   style={{
-                    minHeight: "120px",
-                    padding: "8px 6px",
+                    minHeight: "125px",
+                    padding: "10px 8px",
                     borderRight: "1px solid var(--border-dark)",
                     borderBottom: "1px solid var(--border-dark)",
                     background: isDrop
-                      ? "rgba(59,130,246,0.06)"
+                      ? "rgba(59,130,246,0.12)"
                       : cell.today
                       ? "rgba(59,130,246,0.04)"
+                      : cell.isWeekend
+                      ? "rgba(150,150,150,0.02)"
                       : "transparent",
-                    opacity: cell.current ? 1 : 0.38,
+                    opacity: cell.current ? 1 : 0.35,
                     cursor: cell.current ? "pointer" : "default",
-                    transition: "background 0.15s",
+                    transition: "background 0.15s ease",
                     position: "relative",
                     boxSizing: "border-box",
                   }}
@@ -269,24 +284,32 @@ const Calendar: React.FC<Props> = React.memo(({ events, onEventClick, onDateClic
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    marginBottom: "6px",
+                    marginBottom: "8px",
                   }}>
                     <span style={{
                       display: "inline-flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      width: "26px",
-                      height: "26px",
+                      width: "28px",
+                      height: "28px",
                       borderRadius: "50%",
-                      fontSize: "0.82rem",
-                      fontWeight: cell.today ? 800 : 500,
+                      fontSize: "0.85rem",
+                      fontWeight: cell.today ? 800 : 600,
                       background: cell.today ? "#3b82f6" : "transparent",
                       color: cell.today ? "#fff" : "var(--text-primary)",
+                      boxShadow: cell.today ? "0 2px 8px rgba(59,130,246,0.4)" : "none",
                     }}>
                       {cell.day}
                     </span>
-                    {dayEvts.length > 2 && (
-                      <span style={{ fontSize: "0.65rem", color: "var(--text-secondary)", fontWeight: 600 }}>
+                    {dayEvts.length > 0 && (
+                      <span style={{
+                        fontSize: "0.68rem",
+                        color: "#3b82f6",
+                        fontWeight: 700,
+                        background: "rgba(59,130,246,0.1)",
+                        padding: "2px 6px",
+                        borderRadius: "10px",
+                      }}>
                         {dayEvts.length}
                       </span>
                     )}
@@ -296,7 +319,7 @@ const Calendar: React.FC<Props> = React.memo(({ events, onEventClick, onDateClic
                     <EventCard key={evt.id} event={evt} onClick={onEventClick} onDragStart={handleDragStart} compact />
                   ))}
                   {dayEvts.length > 3 && (
-                    <div style={{ fontSize: "0.68rem", color: "var(--text-secondary)", fontWeight: 600, paddingLeft: "4px" }}>
+                    <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)", fontWeight: 700, paddingLeft: "4px", marginTop: "2px" }}>
                       +{dayEvts.length - 3} more
                     </div>
                   )}
@@ -308,6 +331,7 @@ const Calendar: React.FC<Props> = React.memo(({ events, onEventClick, onDateClic
                       border: "2px dashed #3b82f6",
                       borderRadius: "0",
                       pointerEvents: "none",
+                      background: "rgba(59,130,246,0.08)",
                     }} />
                   )}
                 </div>
@@ -320,9 +344,10 @@ const Calendar: React.FC<Props> = React.memo(({ events, onEventClick, onDateClic
       {viewMode === "week" && (
         <div style={{
           border: "1px solid var(--border-dark)",
-          borderRadius: "12px",
+          borderRadius: "14px",
           overflow: "hidden",
           background: "var(--bg-card)",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
         }}>
           <div style={{
             display: "grid",
@@ -332,17 +357,17 @@ const Calendar: React.FC<Props> = React.memo(({ events, onEventClick, onDateClic
           }}>
             {weekCells.map((cell) => (
               <div key={cell.dateStr} style={{
-                padding: "12px 8px",
+                padding: "14px 8px",
                 textAlign: "center",
                 borderRight: "1px solid var(--border-dark)",
               }}>
                 <div style={{
-                  fontSize: "0.7rem",
-                  fontWeight: 700,
+                  fontSize: "0.73rem",
+                  fontWeight: 800,
                   textTransform: "uppercase",
                   letterSpacing: "0.08em",
                   color: cell.today ? "#3b82f6" : "var(--text-secondary)",
-                  marginBottom: "4px",
+                  marginBottom: "6px",
                 }}>
                   {cell.dayOfWeek.slice(0, 3)}
                 </div>
@@ -350,13 +375,14 @@ const Calendar: React.FC<Props> = React.memo(({ events, onEventClick, onDateClic
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: "32px",
-                  height: "32px",
+                  width: "34px",
+                  height: "34px",
                   borderRadius: "50%",
-                  fontSize: "1rem",
+                  fontSize: "1.05rem",
                   fontWeight: 800,
                   background: cell.today ? "#3b82f6" : "transparent",
                   color: cell.today ? "#fff" : "var(--text-primary)",
+                  boxShadow: cell.today ? "0 2px 8px rgba(59,130,246,0.4)" : "none",
                 }}>
                   {cell.dayNum}
                 </div>
@@ -364,7 +390,7 @@ const Calendar: React.FC<Props> = React.memo(({ events, onEventClick, onDateClic
             ))}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", minHeight: "400px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", minHeight: "440px" }}>
             {weekCells.map((cell) => {
               const dayEvts = eventsByDate[cell.dateStr] || [];
               const isDrop = dropTargetDate === cell.dateStr;
@@ -376,14 +402,14 @@ const Calendar: React.FC<Props> = React.memo(({ events, onEventClick, onDateClic
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, cell.dateStr)}
                   style={{
-                    padding: "10px 8px",
+                    padding: "12px 10px",
                     borderRight: "1px solid var(--border-dark)",
                     background: isDrop
-                      ? "rgba(59,130,246,0.05)"
+                      ? "rgba(59,130,246,0.1)"
                       : cell.today
                       ? "rgba(59,130,246,0.03)"
                       : "transparent",
-                    transition: "background 0.15s",
+                    transition: "background 0.15s ease",
                     cursor: "pointer",
                     position: "relative",
                   }}
@@ -391,8 +417,8 @@ const Calendar: React.FC<Props> = React.memo(({ events, onEventClick, onDateClic
                   {dayEvts.length === 0 ? (
                     <div style={{
                       textAlign: "center",
-                      paddingTop: "32px",
-                      fontSize: "0.72rem",
+                      paddingTop: "40px",
+                      fontSize: "0.75rem",
                       color: "var(--text-muted)",
                     }}>
                       —
@@ -408,6 +434,7 @@ const Calendar: React.FC<Props> = React.memo(({ events, onEventClick, onDateClic
                       inset: 0,
                       border: "2px dashed #3b82f6",
                       pointerEvents: "none",
+                      background: "rgba(59,130,246,0.06)",
                     }} />
                   )}
                 </div>
@@ -424,57 +451,61 @@ const Calendar: React.FC<Props> = React.memo(({ events, onEventClick, onDateClic
         return (
           <div style={{
             border: "1px solid var(--border-dark)",
-            borderRadius: "12px",
+            borderRadius: "14px",
             overflow: "hidden",
             background: "var(--bg-card)",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
           }}>
             <div style={{
-              padding: "20px 24px",
+              padding: "24px 28px",
               background: "var(--bg-secondary)",
               borderBottom: "1px solid var(--border-dark)",
               display: "flex",
               alignItems: "center",
-              gap: "16px",
+              gap: "18px",
             }}>
               <div style={{
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: "52px",
-                height: "52px",
+                width: "56px",
+                height: "56px",
                 borderRadius: "50%",
-                fontSize: "1.5rem",
+                fontSize: "1.6rem",
                 fontWeight: 800,
                 background: isToday ? "#3b82f6" : "var(--bg-card)",
                 color: isToday ? "#fff" : "var(--text-primary)",
                 border: isToday ? "none" : "1px solid var(--border-dark)",
+                boxShadow: isToday ? "0 4px 14px rgba(59,130,246,0.4)" : "none",
               }}>
                 {currentDate.getDate()}
               </div>
               <div>
-                <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text-primary)" }}>
+                <div style={{ fontSize: "1.2rem", fontWeight: 800, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
                   {currentDate.toLocaleDateString("default", { weekday: "long" })}
                 </div>
-                <div style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+                <div style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginTop: "2px" }}>
                   {dayEvts.length} post{dayEvts.length !== 1 ? "s" : ""} scheduled
                 </div>
               </div>
             </div>
 
-            <div style={{ padding: "20px 24px" }}>
+            <div style={{ padding: "24px 28px" }}>
               {dayEvts.length === 0 ? (
                 <div style={{
                   textAlign: "center",
                   padding: "60px 0",
                   color: "var(--text-muted)",
-                  fontSize: "0.9rem",
+                  fontSize: "0.95rem",
                 }}>
                   No posts scheduled for this day.
                   <br />
-                  <span style={{ fontSize: "0.8rem" }}>Click to schedule one.</span>
+                  <span style={{ fontSize: "0.82rem", color: "#3b82f6", fontWeight: 600, cursor: "pointer" }} onClick={() => onDateClick && onDateClick(dayStr)}>
+                    + Click here to schedule one
+                  </span>
                 </div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                   {dayEvts.map((evt) => (
                     <EventCard key={evt.id} event={evt} onClick={onEventClick} onDragStart={handleDragStart} />
                   ))}
