@@ -4,7 +4,9 @@ import {
   setEditorContent,
   addEditorImage,
   removeEditorImage,
+  reorderEditorImages,
   setEditorPlatform,
+  setEditorScheduledAt,
   clearEditor,
   loadDrafts,
   createDraft,
@@ -20,6 +22,7 @@ import Button from "../components/Button";
 import ImageUploader from "../components/ImageUploader";
 import DeadbeatCursor from "../components/DeadbeatCursor";
 import SocialPreview from "../components/SocialPreview";
+import DateTimePicker from "../components/DateTimePicker";
 
 import { validatePost } from "../utils/validation";
 
@@ -31,9 +34,14 @@ function Composer() {
     dispatch(loadDrafts());
   }, [dispatch]);
 
-  const { platform, content, images = [], editing, editingId } = useAppSelector(
-    (state) => state.posts.editor
-  );
+  const {
+    platform,
+    content,
+    images = [],
+    editing,
+    editingId,
+    scheduledAt,
+  } = useAppSelector((state) => state.posts.editor);
 
   const validation = validatePost(platform, content, images);
 
@@ -44,13 +52,15 @@ function Composer() {
       platform,
       content,
       images,
-      image: images[0], // fallback for single image compatibility
-      date: new Date().toLocaleString(),
+      image: images[0],
+      date: scheduledAt
+        ? scheduledAt.slice(0, 10)
+        : new Date().toISOString().slice(0, 10),
+      scheduledAt: scheduledAt || new Date().toISOString(),
     };
 
     if (editing && editingId) {
-      const draftPayload = { ...basePayload, id: editingId };
-      dispatch(updateDraft({ id: editingId, changes: draftPayload }));
+      dispatch(updateDraft({ id: editingId, changes: { ...basePayload, id: editingId } }));
     } else {
       dispatch(createDraft(basePayload));
     }
@@ -69,12 +79,12 @@ function Composer() {
   return (
     <div className="page">
       <DeadbeatCursor />
-      
+
       <div className="composer-page-split">
         <div className="composer-card">
-          <h2>{editing ? "Edit Draft" : "Compose a Post"}</h2>
+          <h2>{editing ? "Edit Draft" : "Compose Post"}</h2>
           <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", marginBottom: "20px" }}>
-            Select a target platform, type your content, and attach media for real-time validation.
+            Select a target platform, write your content, and attach media for real-time validation.
           </p>
 
           <PlatformCard
@@ -96,7 +106,32 @@ function Composer() {
             images={images}
             onAdd={(img) => dispatch(addEditorImage(img))}
             onRemove={(index) => dispatch(removeEditorImage(index))}
+            onReorder={(from, to) => dispatch(reorderEditorImages({ from, to }))}
           />
+
+          <div style={{ marginTop: "16px" }}>
+            <label style={{
+              display: "block",
+              fontSize: "0.85rem",
+              fontWeight: 600,
+              color: "var(--text-secondary)",
+              marginBottom: "8px",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}>
+              Schedule Date &amp; Time
+            </label>
+            <DateTimePicker
+              value={scheduledAt}
+              onChange={(iso) => dispatch(setEditorScheduledAt(iso))}
+              min={new Date().toISOString()}
+            />
+            {!scheduledAt && (
+              <div style={{ fontSize: "0.77rem", color: "var(--text-secondary)", marginTop: "6px" }}>
+                No schedule set — will be saved with the current timestamp.
+              </div>
+            )}
+          </div>
 
           <CharacterCounter platform={platform} count={content.length} />
           <ValidationMessage validation={validation} />
@@ -124,7 +159,11 @@ function Composer() {
             </span>
           </div>
 
-          <SocialPreview platform={platform} content={content} images={images} />
+          <SocialPreview
+            platform={platform}
+            content={content}
+            images={images}
+          />
         </div>
       </div>
     </div>

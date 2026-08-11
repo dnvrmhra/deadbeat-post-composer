@@ -25,6 +25,20 @@ function useTheme(): "dark" | "light" {
   return theme;
 }
 
+function highlightText(text: string, linkColor: string): React.ReactNode[] {
+  const parts = text.split(/([@#][\w]+)/g);
+  return parts.map((part, i) => {
+    if (/^[@#][\w]+$/.test(part)) {
+      return (
+        <span key={i} style={{ color: linkColor, fontWeight: 600, cursor: "pointer" }}>
+          {part}
+        </span>
+      );
+    }
+    return part;
+  });
+}
+
 function Avatar({
   size = 50,
   ring = false,
@@ -158,7 +172,7 @@ function TwitterPreview({ content, images, dark }: { content: string; images?: s
           </div>
 
           <div style={{ fontSize: "1rem", lineHeight: 1.55, whiteSpace: "pre-wrap", wordBreak: "break-word", color: content ? textPri : textMuted, fontStyle: content ? "normal" : "italic", marginBottom: "10px" }}>
-            {content || "What's happening?"}
+            {content ? highlightText(content, "#1d9bf0") : "What's happening?"}
           </div>
 
           {images && images.length > 0 && (
@@ -254,7 +268,7 @@ function InstagramPreview({ content, images, dark }: { content: string; images?:
         <div style={{ fontSize: "0.9rem", lineHeight: 1.5 }}>
           <span style={{ fontWeight: 700, color: textPri }}>deadbeat_studio </span>
           <span style={{ color: content ? textPri : textMuted, fontStyle: content ? "normal" : "italic" }}>
-            {content || "Write a caption..."}
+            {content ? highlightText(content, "#0095f6") : "Write a caption..."}
           </span>
         </div>
         <div style={{ fontSize: "0.8rem", color: textMuted, marginTop: "5px" }}>View all 48 comments</div>
@@ -296,7 +310,7 @@ function LinkedInPreview({ content, images, dark }: { content: string; images?: 
       </div>
 
       <div style={{ padding: "12px 16px", fontSize: "0.95rem", lineHeight: 1.65, color: content ? textPri : textMuted, fontStyle: content ? "normal" : "italic", whiteSpace: "pre-wrap", wordBreak: "break-word", background: card }}>
-        {content ? displayContent : "Share an update, article, or idea..."}
+        {content ? highlightText(displayContent, btnColor) : "Share an update, article, or idea..."}
         {truncated && <span style={{ color: btnColor, cursor: "pointer", fontWeight: 600 }}> ...more</span>}
       </div>
 
@@ -366,7 +380,7 @@ function FacebookPreview({ content, images, dark }: { content: string; images?: 
       </div>
 
       <div style={{ padding: "0 16px 14px", fontSize: "1rem", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", color: content ? textPri : textMuted, fontStyle: content ? "normal" : "italic" }}>
-        {content || "What's on your mind?"}
+        {content ? highlightText(content, "#1877f2") : "What's on your mind?"}
       </div>
 
       {images && images.length > 0 && (
@@ -387,7 +401,7 @@ function FacebookPreview({ content, images, dark }: { content: string; images?: 
         {[
           { label: "Like",    d: "M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" },
           { label: "Comment", d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" },
-          { label: "Share",   d: "M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" },
+          { label: "Share",   d: "M4 12v8a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" },
         ].map(({ label, d }) => (
           <button key={label} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", padding: "11px", background: "transparent", border: "none", cursor: "pointer", color: textMuted, fontWeight: 700, fontSize: "0.9rem", borderRadius: "4px" }}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -401,7 +415,11 @@ function FacebookPreview({ content, images, dark }: { content: string; images?: 
   );
 }
 
-const SocialPreview: React.FC<SocialPreviewProps> = ({ platform, content, images }) => {
+const SocialPreview: React.FC<SocialPreviewProps> = ({
+  platform,
+  content,
+  images,
+}) => {
   const theme = useTheme();
   const dark = theme === "dark";
 

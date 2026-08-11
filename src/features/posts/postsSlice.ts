@@ -9,6 +9,7 @@ export interface Post {
   images?: string[];
   image?: string;
   date: string;
+  scheduledAt?: string;
 }
 
 export interface ValidationResult {
@@ -16,12 +17,22 @@ export interface ValidationResult {
   message: string;
 }
 
+export interface PlatformVariant {
+  content: string;
+  images: string[];
+  customized?: boolean;
+}
+
 export interface EditorState {
   content: string;
   images: string[];
   platform: string;
+  selectedPlatforms: string[];
+  activeTab: string;
+  variants: Record<string, PlatformVariant>;
   editing: boolean;
   editingId?: string;
+  scheduledAt: string;
 }
 
 export interface PostsState {
@@ -32,14 +43,25 @@ export interface PostsState {
 
 export const postsAdapter = createEntityAdapter<Post>();
 
+const defaultVariants = (): Record<string, PlatformVariant> => ({
+  Twitter: { content: '', images: [], customized: false },
+  Instagram: { content: '', images: [], customized: false },
+  LinkedIn: { content: '', images: [], customized: false },
+  Facebook: { content: '', images: [], customized: false },
+});
+
 const initialState: PostsState = {
   posts: postsAdapter.getInitialState(),
   editor: {
     content: '',
     images: [],
     platform: 'Twitter',
+    selectedPlatforms: ['Twitter'],
+    activeTab: 'master',
+    variants: defaultVariants(),
     editing: false,
     editingId: undefined,
+    scheduledAt: '',
   },
   validation: { valid: true, message: '' },
 };
@@ -71,20 +93,148 @@ const postsSlice = createSlice({
   initialState,
   reducers: {
     setEditorContent(state, action: PayloadAction<string>) {
-      state.editor.content = action.payload;
+      const text = action.payload;
+      state.editor.content = text;
+
+      if (state.editor.activeTab === 'master') {
+        Object.keys(state.editor.variants).forEach((p) => {
+          if (!state.editor.variants[p].customized) {
+            state.editor.variants[p].content = text;
+          }
+        });
+      } else {
+        const p = state.editor.activeTab;
+        if (state.editor.variants[p]) {
+          state.editor.variants[p].content = text;
+          state.editor.variants[p].customized = true;
+        }
+      }
     },
+
     setEditorImages(state, action: PayloadAction<string[]>) {
-      state.editor.images = action.payload;
+      const imgs = action.payload;
+      state.editor.images = imgs;
+
+      if (state.editor.activeTab === 'master') {
+        Object.keys(state.editor.variants).forEach((p) => {
+          if (!state.editor.variants[p].customized) {
+            state.editor.variants[p].images = imgs;
+          }
+        });
+      } else {
+        const p = state.editor.activeTab;
+        if (state.editor.variants[p]) {
+          state.editor.variants[p].images = imgs;
+          state.editor.variants[p].customized = true;
+        }
+      }
     },
+
     addEditorImage(state, action: PayloadAction<string>) {
-      state.editor.images = [...state.editor.images, action.payload];
+      const img = action.payload;
+      const currentImgs = state.editor.images;
+      const updated = [...currentImgs, img];
+      state.editor.images = updated;
+
+      if (state.editor.activeTab === 'master') {
+        Object.keys(state.editor.variants).forEach((p) => {
+          if (!state.editor.variants[p].customized) {
+            state.editor.variants[p].images = updated;
+          }
+        });
+      } else {
+        const p = state.editor.activeTab;
+        if (state.editor.variants[p]) {
+          state.editor.variants[p].images = [...state.editor.variants[p].images, img];
+          state.editor.variants[p].customized = true;
+        }
+      }
     },
+
     removeEditorImage(state, action: PayloadAction<number>) {
-      state.editor.images = state.editor.images.filter((_, i) => i !== action.payload);
+      const idx = action.payload;
+      const updated = state.editor.images.filter((_, i) => i !== idx);
+      state.editor.images = updated;
+
+      if (state.editor.activeTab === 'master') {
+        Object.keys(state.editor.variants).forEach((p) => {
+          if (!state.editor.variants[p].customized) {
+            state.editor.variants[p].images = updated;
+          }
+        });
+      } else {
+        const p = state.editor.activeTab;
+        if (state.editor.variants[p]) {
+          state.editor.variants[p].images = state.editor.variants[p].images.filter((_, i) => i !== idx);
+          state.editor.variants[p].customized = true;
+        }
+      }
     },
+
+    reorderEditorImages(state, action: PayloadAction<{ from: number; to: number }>) {
+      const { from, to } = action.payload;
+      const imgs = [...state.editor.images];
+      const [moved] = imgs.splice(from, 1);
+      imgs.splice(to, 0, moved);
+      state.editor.images = imgs;
+
+      Object.keys(state.editor.variants).forEach((p) => {
+        if (!state.editor.variants[p].customized) {
+          state.editor.variants[p].images = imgs;
+        }
+      });
+    },
+
+    setEditorScheduledAt(state, action: PayloadAction<string>) {
+      state.editor.scheduledAt = action.payload;
+    },
+
     setEditorPlatform(state, action: PayloadAction<string>) {
-      state.editor.platform = action.payload;
+      const platformName = action.payload;
+      state.editor.platform = platformName;
+      if (!state.editor.selectedPlatforms.includes(platformName)) {
+        state.editor.selectedPlatforms = [...state.editor.selectedPlatforms, platformName];
+      }
     },
+
+    toggleSelectedPlatform(state, action: PayloadAction<string>) {
+      const p = action.payload;
+      const exists = state.editor.selectedPlatforms.includes(p);
+
+      if (exists) {
+        if (state.editor.selectedPlatforms.length > 1) {
+          state.editor.selectedPlatforms = state.editor.selectedPlatforms.filter((item) => item !== p);
+          if (state.editor.platform === p) {
+            state.editor.platform = state.editor.selectedPlatforms[0];
+          }
+          if (state.editor.activeTab === p) {
+            state.editor.activeTab = 'master';
+          }
+        }
+      } else {
+        state.editor.selectedPlatforms.push(p);
+        if (!state.editor.variants[p].content && state.editor.content) {
+          state.editor.variants[p].content = state.editor.content;
+          state.editor.variants[p].images = state.editor.images;
+        }
+      }
+    },
+
+    setActiveTab(state, action: PayloadAction<string>) {
+      state.editor.activeTab = action.payload;
+    },
+
+    resetVariantCustomization(state, action: PayloadAction<string>) {
+      const p = action.payload;
+      if (state.editor.variants[p]) {
+        state.editor.variants[p] = {
+          content: state.editor.content,
+          images: state.editor.images,
+          customized: false,
+        };
+      }
+    },
+
     setEditing(state, action: PayloadAction<string | Post>) {
       const payload = action.payload;
       const id = typeof payload === 'string' ? payload : payload.id;
@@ -97,24 +247,37 @@ const postsSlice = createSlice({
           ? [draft.image]
           : [];
 
+        const vars = defaultVariants();
+        vars[draft.platform] = { content: draft.content, images: imgs, customized: true };
+
         state.editor = {
           content: draft.content,
           images: imgs,
           platform: draft.platform,
+          selectedPlatforms: [draft.platform],
+          activeTab: 'master',
+          variants: vars,
           editing: true,
           editingId: id,
+          scheduledAt: draft.scheduledAt || '',
         };
       }
     },
+
     clearEditor(state) {
       state.editor = {
         content: '',
         images: [],
         platform: 'Twitter',
+        selectedPlatforms: ['Twitter'],
+        activeTab: 'master',
+        variants: defaultVariants(),
         editing: false,
         editingId: undefined,
+        scheduledAt: '',
       };
     },
+
     setValidation(state, action: PayloadAction<ValidationResult>) {
       state.validation = action.payload;
     },
@@ -150,7 +313,12 @@ export const {
   setEditorImages,
   addEditorImage,
   removeEditorImage,
+  reorderEditorImages,
+  setEditorScheduledAt,
   setEditorPlatform,
+  toggleSelectedPlatform,
+  setActiveTab,
+  resetVariantCustomization,
   setEditing,
   clearEditor,
   setValidation,

@@ -23,11 +23,23 @@ export default function CalendarPage() {
   const reduxEvents: Event[] = useMemo(() => {
     return reduxPosts.map((p) => {
       const imgs = p.images && p.images.length > 0 ? p.images : p.image ? [p.image] : undefined;
+
+      let eventDate = new Date().toISOString().split("T")[0];
+      let eventTime = "10:00 AM";
+
+      if (p.scheduledAt) {
+        const d = new Date(p.scheduledAt);
+        eventDate = d.toISOString().split("T")[0];
+        eventTime = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+      } else if (p.date && p.date.includes("-")) {
+        eventDate = p.date.slice(0, 10);
+      }
+
       return {
         id: p.id,
         title: p.content.slice(0, 60).trim() || `${p.platform} Post`,
-        date: p.date && p.date.includes("-") ? p.date.slice(0, 10) : new Date().toISOString().split("T")[0],
-        time: "10:00 AM",
+        date: eventDate,
+        time: eventTime,
         platform: p.platform,
         content: p.content,
         image: imgs ? imgs[0] : undefined,
@@ -85,6 +97,18 @@ export default function CalendarPage() {
 
   const handleSaveModal = useCallback(
     (eventPayload: Event) => {
+      const scheduledAt = eventPayload.date
+        ? (() => {
+            const base = eventPayload.time
+              ? new Date(`${eventPayload.date}T${eventPayload.time.includes("AM") || eventPayload.time.includes("PM")
+                  ? new Date(`1970-01-01 ${eventPayload.time}`).toTimeString().slice(0, 5)
+                  : eventPayload.time
+                }`)
+              : new Date(`${eventPayload.date}T10:00`);
+            return isNaN(base.getTime()) ? new Date(`${eventPayload.date}T10:00`).toISOString() : base.toISOString();
+          })()
+        : new Date().toISOString();
+
       if (selectedEvent) {
         const isRedux = reduxPosts.some((p) => p.id === selectedEvent.id);
         if (isRedux) {
@@ -94,6 +118,7 @@ export default function CalendarPage() {
               content: eventPayload.content || eventPayload.title,
               platform: eventPayload.platform,
               date: eventPayload.date,
+              scheduledAt,
             },
           }));
         } else {
@@ -106,6 +131,7 @@ export default function CalendarPage() {
           platform: eventPayload.platform,
           content: eventPayload.content || eventPayload.title,
           date: eventPayload.date,
+          scheduledAt,
         }));
       }
     },

@@ -16,24 +16,30 @@ body[data-theme="dark"] {
   --shadow-card: 0 15px 35px rgba(0, 0, 0, 0.5);
   --sun-display: flex;
   --moon-display: none;
+  --active-card-bg: #ffffff;
+  --active-card-text: #000000;
+  --active-card-shadow: 0 8px 25px rgba(255, 255, 255, 0.2);
 }
 
 body[data-theme="light"] {
-  --bg-primary: #f8f9fa;
+  --bg-primary: #f4f5f7;
   --bg-secondary: #ffffff;
   --bg-card: #ffffff;
   --bg-card-solid: #ffffff;
-  --bg-input: #f1f3f5;
+  --bg-input: #f8fafc;
   --text-primary: #0f172a;
   --text-secondary: #475569;
   --text-muted: #64748b;
-  --border-dark: rgba(0, 0, 0, 0.12);
-  --border-light: rgba(0, 0, 0, 0.08);
-  --nav-bg: rgba(255, 255, 255, 0.9);
+  --border-dark: rgba(15, 23, 42, 0.12);
+  --border-light: rgba(15, 23, 42, 0.06);
+  --nav-bg: rgba(255, 255, 255, 0.82);
   --modal-bg: #ffffff;
-  --shadow-card: 0 10px 30px rgba(0, 0, 0, 0.06);
+  --shadow-card: 0 12px 32px -4px rgba(15, 23, 42, 0.06), 0 4px 12px -2px rgba(15, 23, 42, 0.03);
   --sun-display: none;
   --moon-display: flex;
+  --active-card-bg: #0f172a;
+  --active-card-text: #ffffff;
+  --active-card-shadow: 0 8px 25px rgba(15, 23, 42, 0.2);
 }
 
 :root {

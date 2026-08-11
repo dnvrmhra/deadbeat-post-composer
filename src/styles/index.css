@@ -35,10 +35,13 @@ body {
 
 /* Custom Magnetic Cursor */
 @media (min-width: 992px) {
-  body {
-    cursor: none;
+  *,
+  *:hover,
+  *:focus,
+  *:active {
+    cursor: none !important;
   }
-  
+
   .custom-cursor {
     position: fixed;
     top: 0;
