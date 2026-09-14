@@ -19,7 +19,7 @@ function Drafts() {
   const { user } = useAuth();
 
   const state = location.state as LocationState | null;
-
+            
   const [message, setMessage] = useState<string>(
     state?.message || ""
   );
