@@ -1,44 +1,255 @@
-# Spring Boot Lab — Experiments 2.1.1 & 2.1.2
+# Spring Boot Lab
+
+**Experiments 2.1.1 and 2.1.2**
+Backend REST API implementation using Spring Boot, deployed via Docker.
 
 ---
 
-## Experiment 2.1.1 — RESTful APIs with Spring Boot
+## Table of Contents
 
-**Aim:** To design and implement RESTful APIs using Spring Boot with proper validation, standardized responses, and scalable architecture.
+- [Overview](#overview)
+- [Experiments](#experiments)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Technology Stack](#technology-stack)
+- [Getting Started](#getting-started)
+- [API Reference](#api-reference)
+- [Request and Response Format](#request-and-response-format)
+- [Exception Handling](#exception-handling)
+- [Correlation ID and Logging](#correlation-id-and-logging)
+- [Docker](#docker)
+- [Verification Guide](#verification-guide)
+- [Core Concepts](#core-concepts)
+
+---
+
+## Overview
+
+This project implements a RESTful backend system for managing posts using Spring Boot.
+It demonstrates two fundamental backend engineering experiments:
+
+- **Experiment 2.1.1** — REST API design, layered architecture, Bean Validation, standardized responses, and CORS
+- **Experiment 2.1.2** — Global exception handling using `@ControllerAdvice`, request tracing using Correlation IDs with MDC, and structured logging via filters
+
+The application uses an embedded H2 in-memory database and is containerized using Docker for portable, environment-independent deployment.
+
+---
+
+## Experiments
+
+### Experiment 2.1.1 — RESTful APIs with Spring Boot
+
+| Field | Details |
+|---|---|
+| **Aim** | Design and implement RESTful APIs using Spring Boot with proper validation, standardized responses, and scalable architecture |
+| **COs Mapped** | CO1 - BT1, CO3 - BT3 |
 
 **Objectives:**
 - Understand REST API design principles
 - Implement CRUD APIs using Spring Boot
 - Enforce consistent request-response structures
-- Apply validation using Bean Validation (`@NotBlank`, `@Size`, `@NotNull`)
+- Apply validation using Bean Validation annotations
 - Enable secure cross-origin communication via CORS
 
-**COs Mapped:** CO1 - BT1, CO3 - BT3
+**Conceptual Focus:**
+- REST API design principles
+- Spring Boot layered architecture (Controller, Service, Repository)
+- Bean Validation (`@NotBlank`, `@Size`)
+- Standardized API response structure
+- CORS configuration
 
 ---
 
-## Experiment 2.1.2 — Global Exception Handling & Structured Logging
+### Experiment 2.1.2 — Global Exception Handling and Structured Logging
 
-**Aim:** To implement global exception handling and structured logging for building robust and observable backend systems.
+| Field | Details |
+|---|---|
+| **Aim** | Implement global exception handling and structured logging for building robust and observable backend systems |
+| **COs Mapped** | CO3 - BT3 |
 
 **Objectives:**
 - Handle exceptions centrally using `@ControllerAdvice`
 - Implement logging mechanisms for request tracking
-- Use correlation IDs for tracing requests via MDC
-- Improve system observability and debugging
+- Use correlation IDs for tracing requests across the system
+- Improve system observability and debugging capability
 
-**COs Mapped:** CO3 - BT3
+**Conceptual Focus:**
+- Global exception handling with `@RestControllerAdvice`
+- Servlet Filters as middleware interceptors
+- Structured logging via SLF4J and Logback
+- Mapped Diagnostic Context (MDC) for per-request correlation IDs
+- Consistent error response format
 
 ---
 
-## Prerequisites
+## Architecture
 
-| Requirement | Details |
-|---|---|
-| Java | JDK 17+ |
-| Docker | Docker Desktop (for container-based run) |
-| IDE | IntelliJ IDEA / Eclipse / VSCode |
-| API Testing | Postman |
+### Layered Architecture
+
+```
++----------------------------------------------------------+
+|                        CLIENT                            |
+|              Postman / Browser / React App               |
++----------------------------------------------------------+
+                           |
+                    HTTP Request
+                           |
++----------------------------------------------------------+
+|                     DOCKER CONTAINER                     |
+|                                                          |
+|  +----------------------------------------------------+  |
+|  |              CorrelationIdFilter                   |  |
+|  |  Assigns UUID to every request via MDC            |  |
+|  |  Writes X-Correlation-ID to response header       |  |
+|  +----------------------------------------------------+  |
+|                           |                              |
+|  +----------------------------------------------------+  |
+|  |             DispatcherServlet                      |  |
+|  |  Spring MVC front controller — routes requests    |  |
+|  +----------------------------------------------------+  |
+|                           |                              |
+|  +----------------------------------------------------+  |
+|  |          CONTROLLER LAYER (@RestController)        |  |
+|  |  PostController — handles HTTP, returns responses  |  |
+|  +----------------------------------------------------+  |
+|                           |                              |
+|  +----------------------------------------------------+  |
+|  |           SERVICE LAYER (@Service)                 |  |
+|  |  PostService — contains all business logic        |  |
+|  +----------------------------------------------------+  |
+|                           |                              |
+|  +----------------------------------------------------+  |
+|  |         REPOSITORY LAYER (@Repository)             |  |
+|  |  PostRepository — data access via JpaRepository   |  |
+|  +----------------------------------------------------+  |
+|                           |                              |
+|  +----------------------------------------------------+  |
+|  |          H2 IN-MEMORY DATABASE                     |  |
+|  |  Embedded, auto-configured, resets on restart     |  |
+|  +----------------------------------------------------+  |
+|                                                          |
+|  +----------------------------------------------------+  |
+|  |       GlobalExceptionHandler (@RestControllerAdvice)|  |
+|  |  Catches all exceptions — returns structured JSON  |  |
+|  +----------------------------------------------------+  |
++----------------------------------------------------------+
+```
+
+---
+
+### Request Flow
+
+```
+Client sends HTTP request
+          |
+          v
+Embedded Tomcat receives request on port 8080
+          |
+          v
+CorrelationIdFilter (Order 1)
+  - Reads X-Correlation-ID from request header
+  - Generates UUID if not present
+  - Stores ID in MDC (Mapped Diagnostic Context)
+  - Writes ID to response header
+          |
+          v
+DispatcherServlet
+  - Routes request to correct controller method
+          |
+          v
+PostController
+  - @Valid triggers Bean Validation on @RequestBody
+  - If validation fails, MethodArgumentNotValidException is thrown
+  - If valid, delegates to PostService
+          |
+          v
+PostService
+  - Executes business logic
+  - Throws ResourceNotFoundException if resource not found
+          |
+          v
+PostRepository
+  - Performs CRUD operation on H2 database
+          |
+          v
+ApiResponse wrapper applied to result
+          |
+          v
+JSON response returned to client
+          |
+          v
+GlobalExceptionHandler (if any exception was thrown)
+  - Catches ResourceNotFoundException   -> 404 Not Found
+  - Catches MethodArgumentNotValidException -> 400 Bad Request
+  - Catches Exception (catch-all)       -> 500 Internal Server Error
+```
+
+---
+
+### Exception Handling Flow
+
+```
+Request arrives at Controller
+          |
+          v
+Does @Valid pass?
+  |               |
+  YES             NO
+  |               |
+  v               v
+Service     MethodArgumentNotValidException
+  |               |
+  v               v
+Does resource  GlobalExceptionHandler
+exist?         returns 400 Bad Request
+  |               with field-level errors
+  YES   NO
+  |      |
+  v      v
+Result  ResourceNotFoundException
+  |      |
+  v      v
+200 OK  GlobalExceptionHandler
+        returns 404 Not Found
+
+Any unhandled exception at any layer
+          |
+          v
+GlobalExceptionHandler catch-all
+returns 500 Internal Server Error
+```
+
+---
+
+### Docker Build Flow
+
+```
+Source Code + Dockerfile
+          |
+          v
+Stage 1 — Build (maven:3.9.6-eclipse-temurin-17)
+  - COPY pom.xml
+  - RUN mvn dependency:go-offline   <- cached layer, only re-runs if pom.xml changes
+  - COPY src/
+  - RUN mvn clean package -DskipTests
+  - Output: target/demo-0.0.1-SNAPSHOT.jar
+          |
+          v
+Stage 2 — Runtime (eclipse-temurin:17-jre-alpine)
+  - COPY --from=build target/*.jar app.jar
+  - EXPOSE 8080
+  - ENTRYPOINT ["java", "-jar", "app.jar"]
+  - Output: lightweight image (~100MB vs ~500MB with full JDK)
+          |
+          v
+docker build -t spring-boot-lab .
+          |
+          v
+docker run -d -p 8080:8080 --name postapi spring-boot-lab
+          |
+          v
+Application running at localhost:8080
+```
 
 ---
 
@@ -46,62 +257,135 @@
 
 ```
 spring-boot-lab-main/
-├── Dockerfile
-├── pom.xml
-├── mvnw
-├── mvnw.cmd
-└── src/
-    └── main/
-        ├── java/com/example/demo/
-        │   ├── Application.java                        ← Entry point (@SpringBootApplication)
-        │   ├── config/
-        │   │   └── CorsConfig.java                     ← Exp 2.1.1 — CORS configuration
-        │   ├── controller/
-        │   │   └── PostController.java                 ← Exp 2.1.1 — REST API endpoints
-        │   ├── dto/
-        │   │   ├── ApiResponse.java                    ← Exp 2.1.1 — Standardized response wrapper
-        │   │   ├── PostRequestDto.java                 ← Exp 2.1.1 — Request body + Bean Validation
-        │   │   └── PostResponseDto.java                ← Exp 2.1.1 — Response body shape
-        │   ├── exception/
-        │   │   ├── GlobalExceptionHandler.java         ← Exp 2.1.2 — @RestControllerAdvice
-        │   │   └── ResourceNotFoundException.java      ← Exp 2.1.2 — Custom 404 exception
-        │   ├── filter/
-        │   │   └── CorrelationIdFilter.java            ← Exp 2.1.2 — MDC + request logging
-        │   ├── model/
-        │   │   └── Post.java                           ← Exp 2.1.1 — JPA entity
-        │   ├── repository/
-        │   │   └── PostRepository.java                 ← Exp 2.1.1 — JpaRepository (data access)
-        │   └── service/
-        │       └── PostService.java                    ← Exp 2.1.1 — Business logic
-        └── resources/
-            └── application.properties                  ← Server config, H2 DB, logging pattern
+|
+|-- Dockerfile                                      Docker multi-stage build
+|-- pom.xml                                         Maven build configuration
+|-- mvnw                                            Maven wrapper (Unix)
+|-- mvnw.cmd                                        Maven wrapper (Windows)
+|-- README.md
+|
++-- src/
+    +-- main/
+    |   +-- java/com/example/demo/
+    |   |   |
+    |   |   |-- Application.java                   Entry point
+    |   |   |
+    |   |   +-- config/
+    |   |   |   +-- CorsConfig.java                Exp 2.1.1 - CORS
+    |   |   |
+    |   |   +-- controller/
+    |   |   |   +-- PostController.java            Exp 2.1.1 - REST endpoints
+    |   |   |
+    |   |   +-- dto/
+    |   |   |   |-- ApiResponse.java               Exp 2.1.1 - Standardized response
+    |   |   |   |-- PostRequestDto.java            Exp 2.1.1 - Request body + validation
+    |   |   |   +-- PostResponseDto.java           Exp 2.1.1 - Response body shape
+    |   |   |
+    |   |   +-- exception/
+    |   |   |   |-- GlobalExceptionHandler.java    Exp 2.1.2 - @RestControllerAdvice
+    |   |   |   +-- ResourceNotFoundException.java Exp 2.1.2 - Custom 404 exception
+    |   |   |
+    |   |   +-- filter/
+    |   |   |   +-- CorrelationIdFilter.java       Exp 2.1.2 - MDC + request tracing
+    |   |   |
+    |   |   +-- model/
+    |   |   |   +-- Post.java                      Exp 2.1.1 - JPA entity
+    |   |   |
+    |   |   +-- repository/
+    |   |   |   +-- PostRepository.java            Exp 2.1.1 - JpaRepository
+    |   |   |
+    |   |   +-- service/
+    |   |       +-- PostService.java               Exp 2.1.1 - Business logic
+    |   |
+    |   +-- resources/
+    |       +-- application.properties             Server config, H2, logging
+    |
+    +-- test/
+        +-- java/com/example/demo/
+            +-- DemoApplicationTests.java          Context load smoke test
 ```
 
 ---
 
-## How to Run
+## Technology Stack
+
+| Component | Technology | Version |
+|---|---|---|
+| Language | Java | 17 |
+| Framework | Spring Boot | 3.2.5 |
+| Web | Spring MVC (`spring-boot-starter-web`) | 3.2.5 |
+| Data Access | Spring Data JPA | 3.2.5 |
+| Database | H2 In-Memory | Runtime |
+| Validation | Jakarta Bean Validation | via `spring-boot-starter-validation` |
+| Logging | SLF4J + Logback | Bundled with Spring Boot |
+| Build Tool | Maven | 3.9.6 |
+| Containerization | Docker | Multi-stage build |
+| Base Image (build) | `maven:3.9.6-eclipse-temurin-17` | - |
+| Base Image (runtime) | `eclipse-temurin:17-jre-alpine` | - |
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Docker Desktop installed and running
+- OR: Java 17+ and IntelliJ IDEA (for local run without Docker)
+
+---
 
 ### Option 1 — Docker (Recommended)
 
-**Step 1 — Build the image:**
-```bash
+**1. Build the Docker image**
+
+Navigate to the project root (where `Dockerfile` is located):
+
+```powershell
+cd "C:\Users\danme\OneDrive\Desktop\Full Stack\post-composer\spring-boot-lab-main\spring-boot-lab-main"
+```
+
+Build the image:
+
+```
 docker build -t spring-boot-lab .
 ```
 
-**Step 2 — Run the container:**
-```bash
+This compiles the Java source using Maven inside a container and produces a lightweight runtime image.
+First build takes 3 to 5 minutes as Maven downloads all dependencies.
+
+**2. Run the container**
+
+```
 docker run -d -p 8080:8080 --name postapi spring-boot-lab
 ```
 
-**Step 3 — Verify it's running:**
-```bash
+**3. Verify startup**
+
+```
 docker logs postapi
 ```
 
-You should see: `Started Application in X seconds`
+Look for:
+```
+Started Application in X.XXX seconds (process running for X.XXX)
+```
 
-**If container name already exists:**
-```bash
+**4. Test the health endpoint**
+
+```
+http://localhost:8080/api/health
+```
+
+Expected response:
+```
+Spring Boot environment is running inside Docker!
+```
+
+---
+
+**If the container name already exists:**
+
+```
 docker rm -f postapi
 docker run -d -p 8080:8080 --name postapi spring-boot-lab
 ```
@@ -110,50 +394,73 @@ docker run -d -p 8080:8080 --name postapi spring-boot-lab
 
 ### Option 2 — IntelliJ IDEA
 
-1. Open IntelliJ → `File → Open` → select this folder
-2. Wait for Maven to sync dependencies
-3. Open `Application.java` → click the green ▶ Run button
-4. Server starts at `http://localhost:8080`
+1. Open IntelliJ IDEA
+2. Select `File` then `Open` and navigate to this folder
+3. IntelliJ detects `pom.xml` and begins downloading Maven dependencies automatically
+4. If prompted for SDK, go to `File` then `Project Structure` then `SDK` and select or download JDK 17
+5. Open `Application.java` and click the green Run button next to `main()`
+6. Server starts at `http://localhost:8080`
 
 ---
 
-## API Endpoints (Experiment 2.1.1)
+### Docker Command Reference
 
-| Method | URL | Description | Status |
+| Command | Purpose |
+|---|---|
+| `docker build -t spring-boot-lab .` | Build image from Dockerfile |
+| `docker run -d -p 8080:8080 --name postapi spring-boot-lab` | Create and start container |
+| `docker ps` | List running containers |
+| `docker logs postapi` | View application logs |
+| `docker logs -f postapi` | Stream live logs |
+| `docker stop postapi` | Stop the container |
+| `docker start postapi` | Restart a stopped container |
+| `docker rm -f postapi` | Force stop and remove container |
+| `docker rmi spring-boot-lab` | Delete the image |
+| `docker rm -f postapi && docker build -t spring-boot-lab . && docker run -d -p 8080:8080 --name postapi spring-boot-lab` | Full rebuild and restart |
+
+---
+
+## API Reference
+
+**Base URL:** `http://localhost:8080`
+
+| Method | Endpoint | Description | Success Status |
 |---|---|---|---|
-| `GET` | `/api/health` | Health check | `200 OK` |
-| `GET` | `/api/posts` | Get all posts | `200 OK` |
-| `GET` | `/api/posts/{id}` | Get post by ID | `200 OK` / `404` |
-| `POST` | `/api/posts` | Create new post | `201 Created` |
-| `DELETE` | `/api/posts/{id}` | Delete post | `200 OK` / `404` |
+| `GET` | `/api/health` | Health check — confirms app is running | `200 OK` |
+| `GET` | `/api/posts` | Retrieve all posts | `200 OK` |
+| `GET` | `/api/posts/{id}` | Retrieve a single post by ID | `200 OK` |
+| `POST` | `/api/posts` | Create a new post | `201 Created` |
+| `DELETE` | `/api/posts/{id}` | Delete a post by ID | `200 OK` |
 
 ---
 
-## Postman Examples
+## Request and Response Format
 
-### Health Check
-```
-GET http://localhost:8080/api/health
-```
-Response:
-```
-Spring Boot environment is running inside Docker!
-```
+### Standard Request Body (POST /api/posts)
 
----
-
-### Create a Post
-```
-POST http://localhost:8080/api/posts
-Content-Type: application/json
-
+```json
 {
     "title": "My First Post",
-    "content": "Spring Boot is running in Docker!",
+    "content": "Spring Boot is running inside Docker.",
     "author": "Deadbeat"
 }
 ```
-Response (`201 Created`):
+
+**Validation Rules (Bean Validation — Experiment 2.1.1):**
+
+| Field | Constraint | Rule |
+|---|---|---|
+| `title` | `@NotBlank` | Must not be blank |
+| `title` | `@Size(min=3, max=100)` | Must be between 3 and 100 characters |
+| `content` | `@NotBlank` | Must not be blank |
+| `author` | `@NotBlank` | Must not be blank |
+
+---
+
+### Standard Success Response
+
+All successful responses follow this structure (ApiResponse wrapper — Experiment 2.1.1):
+
 ```json
 {
     "success": true,
@@ -161,7 +468,7 @@ Response (`201 Created`):
     "data": {
         "id": 1,
         "title": "My First Post",
-        "content": "Spring Boot is running in Docker!",
+        "content": "Spring Boot is running inside Docker.",
         "author": "Deadbeat",
         "createdAt": "2026-09-14T14:00:00"
     },
@@ -171,27 +478,91 @@ Response (`201 Created`):
 
 ---
 
-### Get All Posts
+### GET All Posts
+
+**Request:**
 ```
 GET http://localhost:8080/api/posts
 ```
-Response (`200 OK`):
+
+**Response (200 OK):**
 ```json
 {
     "success": true,
     "message": "Posts retrieved successfully",
-    "data": [...],
+    "data": [
+        {
+            "id": 1,
+            "title": "My First Post",
+            "content": "Spring Boot is running inside Docker.",
+            "author": "Deadbeat",
+            "createdAt": "2026-09-14T14:00:00"
+        }
+    ],
     "timestamp": "2026-09-14T14:00:00"
 }
 ```
 
 ---
 
-### Get Post by ID (404 Demo — Experiment 2.1.2)
+### GET Post by ID
+
+**Request:**
+```
+GET http://localhost:8080/api/posts/1
+```
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "message": "Post retrieved successfully",
+    "data": {
+        "id": 1,
+        "title": "My First Post",
+        "content": "Spring Boot is running inside Docker.",
+        "author": "Deadbeat",
+        "createdAt": "2026-09-14T14:00:00"
+    },
+    "timestamp": "2026-09-14T14:00:00"
+}
+```
+
+---
+
+### DELETE Post
+
+**Request:**
+```
+DELETE http://localhost:8080/api/posts/1
+```
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "message": "Post deleted successfully",
+    "data": null,
+    "timestamp": "2026-09-14T14:00:00"
+}
+```
+
+---
+
+## Exception Handling
+
+All errors are handled centrally by `GlobalExceptionHandler.java` using `@RestControllerAdvice` (Experiment 2.1.2). No try-catch blocks exist in the controller.
+
+---
+
+### 404 Not Found — ResourceNotFoundException
+
+**Request:**
 ```
 GET http://localhost:8080/api/posts/999
 ```
-Response (`404 Not Found`):
+
+**Response (404 Not Found):**
 ```json
 {
     "success": false,
@@ -203,7 +574,9 @@ Response (`404 Not Found`):
 
 ---
 
-### Validation Error Demo (Experiment 2.1.2)
+### 400 Bad Request — Bean Validation Failure
+
+**Request:**
 ```
 POST http://localhost:8080/api/posts
 Content-Type: application/json
@@ -214,7 +587,8 @@ Content-Type: application/json
     "author": ""
 }
 ```
-Response (`400 Bad Request`):
+
+**Response (400 Bad Request):**
 ```json
 {
     "success": true,
@@ -228,17 +602,18 @@ Response (`400 Bad Request`):
 }
 ```
 
+The `data` field contains a map of field names to their specific validation error messages.
+
 ---
 
-### Delete a Post
-```
-DELETE http://localhost:8080/api/posts/1
-```
-Response (`200 OK`):
+### 500 Internal Server Error — Catch-All
+
+Any unhandled exception returns:
+
 ```json
 {
-    "success": true,
-    "message": "Post deleted successfully",
+    "success": false,
+    "message": "An unexpected error occurred: <exception message>",
     "data": null,
     "timestamp": "2026-09-14T14:00:00"
 }
@@ -246,330 +621,298 @@ Response (`200 OK`):
 
 ---
 
-## H2 Database Console
+### Exception Handler Mapping
 
-While the app is running (IntelliJ only — not Docker):
-
-- URL: `http://localhost:8080/h2-console`
-- JDBC URL: `jdbc:h2:mem:testdb`
-- Username: `sa`
-- Password: *(leave blank)*
-
----
-
-## Verifying Experiment 2.1.2
-
-### 1. Correlation ID (CorrelationIdFilter + MDC)
-Send any request in Postman → click **Headers** tab in the response.
-
-You will see:
 ```
-X-Correlation-ID  →  550e8400-e29b-41d4-a716-446655440000
-```
-
-Every request gets a **unique UUID**. This same ID appears in the application logs.
-
-### 2. Global Exception Handler — 404
-```
-GET http://localhost:8080/api/posts/999
-```
-Returns structured JSON error instead of a raw Java stack trace.
-
-### 3. Global Exception Handler — Validation (400)
-Send a POST with blank fields — returns per-field error messages in `data`.
-
-### 4. Logs (Docker)
-```bash
-docker logs postapi
-```
-Every log line includes the correlation ID in brackets:
-```
-[a3f7c19b-2d4e] INFO  PostController - Fetching all posts
-[a3f7c19b-2d4e] INFO  PostService - Returning 3 posts from DB
+Exception Type                         HTTP Status    Handler Method
+---------------------------------------------------------------------
+ResourceNotFoundException          ->  404            handleNotFound()
+MethodArgumentNotValidException    ->  400            handleValidationErrors()
+Exception (catch-all)              ->  500            handleGenericException()
 ```
 
 ---
 
-## Experiment Coverage
+## Correlation ID and Logging
 
-### 2.1.1 — RESTful APIs
+Implemented in `CorrelationIdFilter.java` (Experiment 2.1.2).
 
-| Requirement | File | Implementation |
-|---|---|---|
-| REST API design | `PostController.java` | Stateless HTTP, resource URIs, standard methods |
-| Controller layer | `PostController.java` | `@RestController`, handles HTTP, delegates to service |
-| Service layer | `PostService.java` | `@Service`, contains all business logic |
-| Repository layer | `PostRepository.java` | `@Repository`, extends `JpaRepository` |
-| CRUD operations | `PostController.java` | `GET`, `POST`, `DELETE` endpoints |
-| Bean Validation | `PostRequestDto.java` | `@NotBlank`, `@Size` on all fields |
-| Standardized response | `ApiResponse.java` | Generic wrapper with `success`, `message`, `data`, `timestamp` |
-| CORS configuration | `CorsConfig.java` | Allows frontend origins, exposes correlation header |
-
-### 2.1.2 — Exception Handling & Logging
-
-| Requirement | File | Implementation |
-|---|---|---|
-| `@ControllerAdvice` | `GlobalExceptionHandler.java` | `@RestControllerAdvice` handles all exceptions centrally |
-| Custom exception | `ResourceNotFoundException.java` | Thrown when post ID not found → mapped to `404` |
-| Validation exception | `GlobalExceptionHandler.java` | `MethodArgumentNotValidException` → mapped to `400` with field errors |
-| Generic safety net | `GlobalExceptionHandler.java` | Catch-all `Exception` handler → mapped to `500` |
-| Filter / Interceptor | `CorrelationIdFilter.java` | Implements `Filter`, intercepts every request |
-| Correlation ID | `CorrelationIdFilter.java` | UUID generated per request, stored in MDC |
-| Structured logging | `application.properties` | `[%X{correlationId}]` in every log line via Logback |
-| Response header | `CorrelationIdFilter.java` | `X-Correlation-ID` written to every response |
-
----
-
-## Request Flow
+### How It Works
 
 ```
-Client (Postman / Browser / React Frontend)
-        ↓
-Docker Container (port 8080)
-        ↓
-CorrelationIdFilter     → assigns unique trace ID (Exp 2.1.2)
-        ↓
-PostController          → receives the HTTP request (Exp 2.1.1)
-        ↓
-PostRequestDto + @Valid → validates request body (Exp 2.1.1)
-        ↓
-PostService             → executes business logic (Exp 2.1.1)
-        ↓
-PostRepository          → reads/writes H2 database (Exp 2.1.1)
-        ↓
-ApiResponse wrapper     → wraps result in standard format (Exp 2.1.1)
-        ↓
-GlobalExceptionHandler  → catches any error, returns structured JSON (Exp 2.1.2)
-        ↓
-JSON Response to Client
+Incoming request
+      |
+      v
+Read X-Correlation-ID header
+      |
+      +-- Header present? -- YES --> use provided ID
+      |
+      +-- Header absent?  -- YES --> generate UUID
+      |
+      v
+Store ID in MDC (Mapped Diagnostic Context)
+      |
+      v
+Write ID to X-Correlation-ID response header
+      |
+      v
+Process request (all log lines for this request include the ID)
+      |
+      v
+Request complete
+      |
+      v
+MDC.remove() -- clears ID to prevent thread-pool leakage
 ```
 
 ---
 
-## Docker Commands Reference
+### Log Output Format
 
-| Command | Purpose |
-|---|---|
-| `docker build -t spring-boot-lab .` | Build the image from Dockerfile |
-| `docker run -d -p 8080:8080 --name postapi spring-boot-lab` | Create and start a container |
-| `docker ps` | List running containers |
-| `docker logs postapi` | View application logs |
-| `docker logs -f postapi` | Stream live logs |
-| `docker stop postapi` | Stop the container |
-| `docker start postapi` | Start a stopped container |
-| `docker rm -f postapi` | Force remove the container |
-| `docker rmi spring-boot-lab` | Delete the image |
+Configured in `application.properties`:
+
+```
+logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss} [%X{correlationId}] %-5level %logger{36} - %msg%n
+```
+
+Sample log output for a single request:
+
+```
+2026-09-14 14:00:01 [a3f7c19b-2d4e-8f01-c2d3-e4f5a6b7c8d9] INFO  c.e.d.controller.PostController - Creating new post with title: My First Post
+2026-09-14 14:00:01 [a3f7c19b-2d4e-8f01-c2d3-e4f5a6b7c8d9] INFO  c.e.d.service.PostService - Saving post to database
+2026-09-14 14:00:01 [a3f7c19b-2d4e-8f01-c2d3-e4f5a6b7c8d9] INFO  c.e.d.controller.PostController - Post created with ID: 1
+```
+
+Every log line for the same request carries the same correlation ID, enabling full lifecycle tracing.
 
 ---
 
-## Dockerfile — How It Works
+### Verifying the Correlation ID in Postman
+
+After sending any request:
+
+1. Click the **Headers** tab in the Postman response panel
+2. Locate the following header:
+
+```
+X-Correlation-ID    a3f7c19b-2d4e-8f01-c2d3-e4f5a6b7c8d9
+```
+
+3. Send the same request again — a new unique ID is generated for each request
+
+---
+
+## Docker
+
+### Dockerfile Explained
 
 ```dockerfile
 # Stage 1: Build
-# Maven + JDK 17 compiles and packages the app into a JAR
+# Uses Maven with JDK 17 to compile and package the application
 FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
+
+# Copy pom.xml first — allows Docker to cache the dependency download layer
+# This layer only re-runs when pom.xml changes, not on every source code change
 COPY pom.xml .
-RUN mvn dependency:go-offline -q     # Cache dependencies as a separate layer
+RUN mvn dependency:go-offline -q
+
+# Copy source and build the JAR, skipping tests
 COPY src ./src
-RUN mvn clean package -DskipTests -q # Compile and package
+RUN mvn clean package -DskipTests -q
 
 # Stage 2: Runtime
-# Lightweight Alpine JRE — no compiler, smaller image (~100MB vs ~500MB)
+# Uses a lightweight Alpine JRE — no compiler needed
+# Final image is approximately 100MB instead of 500MB with full JDK
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
+
 COPY --from=build /app/target/*.jar app.jar
+
 EXPOSE 8080
+
 ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
 
-The 2-stage build means:
-- Stage 1 has Maven + full JDK (heavy) — used only during build
-- Stage 2 has only the JRE (lightweight) — what actually runs in production
+### Why Multi-Stage Build
+
+| Aspect | Single Stage | Multi-Stage |
+|---|---|---|
+| Image size | ~500MB (full JDK + Maven) | ~100MB (JRE only) |
+| Security surface | Large | Minimal |
+| Build artifacts in image | Yes (source, .class files) | No |
+| Production suitability | No | Yes |
 
 ---
 
-## Video References
+## Verification Guide
 
-- [NodeJS](https://youtube.com/playlist?list=PL1BztTYDF-QPdTvgsjf8HOwO4ZVl_LhxS)
-- [Spring Boot - 1](https://youtube.com/playlist?list=PLA3GkZPtsafacdBLdd3p1DyRd5FGfr3Ue)
-- [Spring Boot - 2](https://youtube.com/playlist?list=PL-bgVzzRdaPhNeXyQBtp8hMlUc14J2kRK)
-- [Microservices in Spring Boot](https://youtube.com/playlist?list=PL-bgVzzRdaPgSkWO70qrskTKZCHA5SCai)
+### Verifying Experiment 2.1.1
 
----
-
-## Spring Boot Core Concepts
-
-### What is Spring Boot?
-
-Spring Boot is a framework built on top of the Spring Framework. It helps developers create production-ready Java applications quickly with minimal configuration.
-
-Think of it like this in Node.js terms:
-- Express is a web framework for Node.js
-- Spring Boot is the Java equivalent of Express + dependency injection + config system + application lifecycle management — all bundled together
+| Test | Request | Expected Result |
+|---|---|---|
+| CRUD — Create | `POST /api/posts` with valid body | `201 Created`, post in `data` field |
+| CRUD — Read All | `GET /api/posts` | `200 OK`, array in `data` field |
+| CRUD — Read One | `GET /api/posts/1` | `200 OK`, single post in `data` field |
+| CRUD — Delete | `DELETE /api/posts/1` | `200 OK`, `data: null` |
+| Validation | `POST /api/posts` with blank fields | `400`, field errors in `data` map |
+| Standardized response | Any request | All responses have `success`, `message`, `data`, `timestamp` |
+| CORS | Request from `localhost:5173` | No CORS error, `X-Correlation-ID` header exposed |
 
 ---
 
-### Key Terminologies
+### Verifying Experiment 2.1.2
 
-#### Bean
-A bean is any object managed by Spring. Examples: service class, repository class, controller class.
+| Test | How to Test | Expected Result |
+|---|---|---|
+| Correlation ID generated | Send any request, check response Headers tab in Postman | `X-Correlation-ID` header present with UUID value |
+| Unique ID per request | Send same request twice | Different UUID in each response |
+| MDC in logs | `docker logs postapi` after making requests | Correlation ID appears in square brackets in every log line |
+| 404 handling | `GET /api/posts/999` | Structured JSON error, not HTML stack trace |
+| 400 validation handling | `POST /api/posts` with empty fields | `400` response with per-field error messages in `data` |
+| 500 catch-all | Handled internally | Any unhandled exception returns structured JSON |
+
+---
+
+## Core Concepts
+
+### Spring Boot Layered Architecture
+
+| Layer | Annotation | Responsibility |
+|---|---|---|
+| Controller | `@RestController` | Receives HTTP requests, returns HTTP responses |
+| Service | `@Service` | Contains business logic, orchestrates operations |
+| Repository | `@Repository` | Interacts with the database |
+| Model | `@Entity` | Represents a database table as a Java class |
+
+---
+
+### Key Annotations
+
+| Annotation | Purpose |
+|---|---|
+| `@SpringBootApplication` | Entry point — enables auto-configuration, component scanning, and configuration |
+| `@RestController` | Marks a class as a REST controller — all methods return JSON by default |
+| `@RequestMapping` | Maps a URL prefix to a controller class |
+| `@GetMapping` | Maps HTTP GET requests to a method |
+| `@PostMapping` | Maps HTTP POST requests to a method |
+| `@DeleteMapping` | Maps HTTP DELETE requests to a method |
+| `@PathVariable` | Binds a URI template variable to a method parameter |
+| `@RequestBody` | Deserializes the HTTP request body JSON into a Java object |
+| `@Valid` | Triggers Bean Validation on the annotated parameter |
+| `@NotBlank` | Field must not be null, empty, or whitespace-only |
+| `@Size` | Field length must be within the specified min and max |
+| `@RestControllerAdvice` | Marks a class as a global exception handler for all REST controllers |
+| `@ExceptionHandler` | Maps a specific exception type to a handler method |
+| `@Component` | Registers a class as a Spring-managed bean |
+| `@Order` | Specifies the execution order of filters or beans |
+
+---
+
+### Dependency Injection
+
+Spring Boot uses constructor injection to wire dependencies automatically:
 
 ```java
 @Service
 public class PostService {
-    // Spring creates and manages this object automatically
-}
-```
 
-Node.js analogy — in Node.js you `require()` and instantiate modules yourself. In Spring, the framework creates and injects them for you.
-
----
-
-#### Dependency Injection (DI)
-Giving an object its dependencies from outside rather than creating them internally.
-
-```java
-@Service
-public class PostService {
     private final PostRepository postRepository;
 
-    // Spring automatically provides PostRepository here
+    // Spring provides PostRepository automatically — no manual instantiation
     public PostService(PostRepository postRepository) {
         this.postRepository = postRepository;
     }
 }
 ```
 
-Node.js equivalent:
-```js
-const postRepository = require('./postRepository');
-const postService = new PostService(postRepository);
-```
+The developer defines what is needed. The Spring IoC container creates and provides the objects.
 
 ---
 
-#### Inversion of Control (IoC)
-The framework controls object creation instead of the developer writing manual `new` logic.
+### Inversion of Control (IoC) vs Dependency Injection (DI)
 
-Instead of:
-```java
-PostService service = new PostService(new PostRepository());
-```
-
-Spring does this automatically when the application starts.
-
----
-
-#### Component Scanning
-Spring scans packages to find classes marked with annotations and registers them as beans:
-- `@Component` — generic bean
-- `@Service` — business logic
-- `@Repository` — data access
-- `@RestController` — REST API handler
-- `@Configuration` — configuration class
-
----
-
-#### Key Annotations
-
-| Annotation | Purpose |
+| Concept | Definition |
 |---|---|
-| `@SpringBootApplication` | Entry point — combines `@Configuration`, `@EnableAutoConfiguration`, `@ComponentScan` |
-| `@RestController` | Marks class as REST API controller |
-| `@RequestMapping` | Maps URL prefix to a controller class |
-| `@GetMapping` / `@PostMapping` / `@DeleteMapping` | Maps specific HTTP methods to methods |
-| `@Service` | Marks business logic class as a Spring bean |
-| `@Repository` | Marks data access class as a Spring bean |
-| `@Valid` | Triggers Bean Validation on the request body |
-| `@RequestBody` | Reads JSON body from HTTP request |
-| `@PathVariable` | Reads `{id}` from the URL path |
-| `@RestControllerAdvice` | Global exception handler for all controllers |
-| `@ExceptionHandler` | Maps an exception type to a handler method |
-| `@Component` | Generic Spring-managed bean |
-| `@Order(1)` | Ensures filter runs first in the chain |
+| IoC | The framework controls the creation and lifecycle of objects, not the developer |
+| DI | Objects receive their dependencies from outside rather than creating them internally |
+| Relationship | IoC is the principle. DI is the implementation pattern used to achieve it. |
 
 ---
 
-### Spring Boot Request Flow
-
-```text
-HTTP Request
-    ↓
-Embedded Tomcat
-    ↓
-Filter Chain (CorrelationIdFilter)
-    ↓
-DispatcherServlet
-    ↓
-Controller (@RestController)
-    ↓
-Service (@Service)
-    ↓
-Repository (@Repository)
-    ↓
-Database (H2)
-    ↓
-Response
-```
-
-`DispatcherServlet` is Spring's front controller — it receives all HTTP requests and routes them to the correct controller method.
-
----
-
-### Spring Boot vs Node.js Comparison
+### Spring Boot vs Node.js
 
 | Topic | Node.js (Express) | Spring Boot |
 |---|---|---|
-| Runtime | Node.js | JVM (Java Virtual Machine) |
+| Runtime | Node.js | JVM |
 | Package manager | npm / package.json | Maven / pom.xml |
 | Server startup | `app.listen(3000)` | `SpringApplication.run(...)` |
-| Request handling | route handlers | `@RestController` methods |
-| Dependency management | `require()` | Spring IoC container + DI |
-| Object creation | manual `new` | container-managed beans |
-| Configuration | `.env`, JSON | `application.properties` |
-| Routing | Express router | `@GetMapping`, `@PostMapping` |
-| Business layer | service functions | `@Service` classes |
-| Data access | Prisma / Sequelize | `@Repository` + JPA |
-| Auto-configuration | not built-in | built-in Spring Boot auto-config |
+| Request handling | Route handlers and middleware | Controllers and DispatcherServlet |
+| Dependency management | `require()` and manual wiring | Spring IoC container and DI |
+| Object creation | Manual `new` calls | Container-managed beans |
+| Configuration | `.env` or JSON config files | `application.properties` or `application.yml` |
+| Routing | Express Router | `@GetMapping`, `@PostMapping` |
+| Business layer | Service functions | `@Service` classes |
+| Data access | Prisma, Sequelize, custom queries | Spring Data JPA with `@Repository` |
+| Auto-configuration | Not built-in | Built into Spring Boot |
+| Exception handling | `app.use((err, req, res, next) => ...)` | `@RestControllerAdvice` |
 
 ---
 
-### Maven Lifecycle
+### Maven Build Lifecycle
 
-| Phase | What it does |
+| Phase | What It Does |
 |---|---|
-| `compile` | Compiles `.java` → `.class` bytecode |
-| `test` | Runs unit tests |
-| `package` | Creates the `.jar` file |
-| `install` | Installs jar to local Maven repository |
-| `clean` | Deletes the `target/` folder |
+| `clean` | Deletes the `target/` build output directory |
+| `compile` | Compiles `.java` source files into `.class` bytecode |
+| `test` | Executes unit tests |
+| `package` | Bundles compiled code into a `.jar` file |
+| `install` | Installs the JAR into the local Maven repository |
+| `deploy` | Publishes the JAR to a remote repository |
 
-Common commands:
-```bash
-mvn clean package -DskipTests   # Build JAR, skip tests
-mvn spring-boot:run             # Run directly without building JAR
-mvn test                        # Run all tests
+The Docker build uses:
+```
+mvn clean package -DskipTests
 ```
 
+This cleans previous output, compiles, and packages the JAR while skipping tests for faster container builds.
+
 ---
 
-### application.properties Explained
+### application.properties Reference
 
 ```properties
-spring.application.name=demo          # App name shown in logs
-server.port=8080                      # Port the server listens on
+spring.application.name=demo
 
-spring.datasource.url=jdbc:h2:mem:testdb    # H2 in-memory database
-spring.datasource.username=sa               # DB username
-spring.datasource.password=                 # DB password (blank for H2)
+# Server
+server.port=8080
 
-spring.jpa.hibernate.ddl-auto=create-drop   # Auto-create tables on start
-spring.jpa.show-sql=true                    # Print SQL queries in logs
+# H2 In-Memory Database
+spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+spring.datasource.driver-class-name=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=
 
-spring.h2.console.enabled=true              # Enable H2 web console
-spring.h2.console.path=/h2-console          # URL path for H2 console
+# JPA and Hibernate
+spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+spring.jpa.hibernate.ddl-auto=create-drop
+spring.jpa.show-sql=true
 
-# Logging pattern — includes correlationId from MDC (Exp 2.1.2)
+# H2 Console (available at /h2-console when running in IntelliJ)
+spring.h2.console.enabled=true
+spring.h2.console.path=/h2-console
+
+# Structured logging with MDC correlationId placeholder
+logging.level.com.example.demo=DEBUG
+logging.level.org.springframework.web=INFO
 logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss} [%X{correlationId}] %-5level %logger{36} - %msg%n
 ```
+
+---
+
+## Video References
+
+- NodeJS: https://youtube.com/playlist?list=PL1BztTYDF-QPdTvgsjf8HOwO4ZVl_LhxS
+- Spring Boot 1: https://youtube.com/playlist?list=PLA3GkZPtsafacdBLdd3p1DyRd5FGfr3Ue
+- Spring Boot 2: https://youtube.com/playlist?list=PL-bgVzzRdaPhNeXyQBtp8hMlUc14J2kRK
+- Microservices in Spring Boot: https://youtube.com/playlist?list=PL-bgVzzRdaPgSkWO70qrskTKZCHA5SCai
