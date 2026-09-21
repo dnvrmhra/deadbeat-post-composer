@@ -13,6 +13,18 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Experiment 2.1.1 — REST Controller
+ *
+ * Endpoints aligned with the CalendarPage / Composer data flow:
+ *
+ *   POST   /api/posts                       Create a scheduled post
+ *   GET    /api/posts                       Get all scheduled posts (calendar grid)
+ *   GET    /api/posts/{id}                  Get single post (event detail)
+ *   GET    /api/posts/platform/{platform}   Filter calendar by platform tab
+ *   PUT    /api/posts/{id}                  Update post (drag-and-drop rescheduling)
+ *   DELETE /api/posts/{id}                  Delete post (delete button in calendar modal)
+ */
 @RestController
 @RequestMapping("/api/posts")
 public class PostController {
@@ -24,15 +36,18 @@ public class PostController {
         this.postService = postService;
     }
 
+    // Create a new scheduled post (from Composer or CalendarPage modal)
     @PostMapping
-    public ResponseEntity<ApiResponse<PostResponseDto>> createPost(@Valid @RequestBody PostRequestDto dto) {
-        log.info("Creating new post with title: {}", dto.getTitle());
+    public ResponseEntity<ApiResponse<PostResponseDto>> createPost(
+            @Valid @RequestBody PostRequestDto dto) {
+        log.info("Creating post: platform={} scheduledAt={}", dto.getPlatform(), dto.getScheduledAt());
         PostResponseDto created = postService.createPost(dto);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Post created successfully", created));
+                .body(ApiResponse.success("Post scheduled successfully", created));
     }
 
+    // Fetch all posts — used to populate the calendar grid
     @GetMapping
     public ResponseEntity<ApiResponse<List<PostResponseDto>>> getAllPosts() {
         log.info("Fetching all posts");
@@ -40,16 +55,39 @@ public class PostController {
         return ResponseEntity.ok(ApiResponse.success("Posts retrieved successfully", posts));
     }
 
+    // Fetch a single post — used when clicking an event in the calendar
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<PostResponseDto>> getPostById(@PathVariable Long id) {
-        log.info("Fetching post ID: {}", id);
+    public ResponseEntity<ApiResponse<PostResponseDto>> getPostById(
+            @PathVariable Long id) {
+        log.info("Fetching post id={}", id);
         PostResponseDto post = postService.getPostById(id);
         return ResponseEntity.ok(ApiResponse.success("Post retrieved successfully", post));
     }
 
+    // Filter posts by platform — matches the platform filter tabs in CalendarPage
+    @GetMapping("/platform/{platform}")
+    public ResponseEntity<ApiResponse<List<PostResponseDto>>> getPostsByPlatform(
+            @PathVariable String platform) {
+        log.info("Fetching posts for platform={}", platform);
+        List<PostResponseDto> posts = postService.getPostsByPlatform(platform);
+        return ResponseEntity.ok(ApiResponse.success("Posts retrieved for platform: " + platform, posts));
+    }
+
+    // Update a post — used when drag-and-dropping to a new date in CalendarPage
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<PostResponseDto>> updatePost(
+            @PathVariable Long id,
+            @Valid @RequestBody PostRequestDto dto) {
+        log.info("Updating post id={}", id);
+        PostResponseDto updated = postService.updatePost(id, dto);
+        return ResponseEntity.ok(ApiResponse.success("Post updated successfully", updated));
+    }
+
+    // Delete a post — used by the delete button in the CalendarPage modal
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> deletePost(@PathVariable Long id) {
-        log.info("Deleting post ID: {}", id);
+    public ResponseEntity<ApiResponse<Void>> deletePost(
+            @PathVariable Long id) {
+        log.info("Deleting post id={}", id);
         postService.deletePost(id);
         return ResponseEntity.ok(ApiResponse.success("Post deleted successfully", null));
     }

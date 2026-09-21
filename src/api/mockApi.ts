@@ -134,21 +134,12 @@ function getStoredDrafts(): Post[] {
 
 function saveStoredDrafts(drafts: Post[]): void {
   try {
-    localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
+    // Strip images before persisting — base64 strings are too large for localStorage.
+    // Images live in Redux memory only and are re-uploaded when editing.
+    const slim = drafts.map(({ images: _images, image: _image, ...rest }) => rest);
+    localStorage.setItem(DRAFTS_KEY, JSON.stringify(slim));
   } catch (e) {
-    console.warn("Storage quota limit reached, attempting fallback optimization...", e);
-    // Fallback: trim older heavy image data if localStorage is full
-    const safeDrafts = drafts.map((d, i) => {
-      if (i < drafts.length - 3 && d.images && d.images.length > 1) {
-        return { ...d, images: [d.images[0]] };
-      }
-      return d;
-    });
-    try {
-      localStorage.setItem(DRAFTS_KEY, JSON.stringify(safeDrafts));
-    } catch (err) {
-      console.error("Critical storage failure:", err);
-    }
+    console.warn("localStorage write failed:", e);
   }
 }
 

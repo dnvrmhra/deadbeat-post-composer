@@ -25,6 +25,7 @@ import SocialPreview from "../components/SocialPreview";
 import DateTimePicker from "../components/DateTimePicker";
 
 import { validatePost } from "../utils/validation";
+import { backendApi } from "../api/backendApi";
 
 const PLATFORM_COLORS: Record<string, string> = {
   Twitter:   "#1d9bf0",
@@ -58,58 +59,79 @@ function Composer() {
     }
   }, [selectedPlatforms, previewPlatform]);
 
-  const validation = validatePost(previewPlatform, content, images);
+  const [saving, setSaving] = useState(false);
+
+  // Validate against the most restrictive selected platform
+  // (e.g. if Instagram is selected, image requirement always applies)
+  const strictestValidation = selectedPlatforms.reduce(
+    (worst, p) => {
+      const v = validatePost(p, content, images);
+      if (!v.valid) return v;
+      return worst;
+    },
+    validatePost(previewPlatform, content, images)
+  );
 
   function handleToggle(p: string) {
     if (selectedPlatforms.includes(p) && selectedPlatforms.length === 1) return;
     dispatch(toggleSelectedPlatform(p));
   }
 
-  function handleSave(): void {
-    if (!validation.valid) return;
+  async function handleSave(): Promise<void> {
+    if (!strictestValidation.valid || saving) return;
+
+    setSaving(true);
 
     const baseDate = scheduledAt
       ? scheduledAt.slice(0, 10)
       : new Date().toISOString().slice(0, 10);
     const baseScheduledAt = scheduledAt || new Date().toISOString();
 
-    if (editing && editingId) {
-      dispatch(updateDraft({
-        id: editingId,
-        changes: {
+    try {
+      // Check backend reachability once — not once per platform
+      const useBackend = await backendApi.isReachable();
+
+      if (editing && editingId) {
+        await dispatch(updateDraft({
           id: editingId,
-          platform: selectedPlatforms[0],
-          content,
-          images,
-          image: images[0],
-          date: baseDate,
-          scheduledAt: baseScheduledAt,
-        },
-      }));
-    } else {
-      selectedPlatforms.forEach((platform) => {
-        dispatch(createDraft({
-          platform,
-          content,
-          images,
-          image: images[0],
-          date: baseDate,
-          scheduledAt: baseScheduledAt,
+          changes: {
+            id: editingId,
+            platform: selectedPlatforms[0],
+            content,
+            images,
+            image: images[0],
+            date: baseDate,
+            scheduledAt: baseScheduledAt,
+          },
         }));
+      } else {
+        for (const platform of selectedPlatforms) {
+          await dispatch(createDraft({
+            platform,
+            content,
+            images,
+            image: images[0],
+            date: baseDate,
+            scheduledAt: baseScheduledAt,
+            _useBackend: useBackend,
+          }));
+        }
+      }
+
+      dispatch(clearEditor());
+
+      navigate("/drafts", {
+        state: {
+          message: editing
+            ? "Draft updated successfully!"
+            : selectedPlatforms.length > 1
+              ? `Saved ${selectedPlatforms.length} drafts successfully!`
+              : "Draft saved successfully!",
+        },
       });
+    } finally {
+      setSaving(false);
     }
-
-    dispatch(clearEditor());
-
-    navigate("/drafts", {
-      state: {
-        message: editing
-          ? "Draft updated successfully!"
-          : selectedPlatforms.length > 1
-            ? `Saved ${selectedPlatforms.length} drafts successfully!`
-            : "Draft saved successfully!",
-      },
-    });
   }
 
   return (
@@ -170,17 +192,20 @@ function Composer() {
           </div>
 
           <CharacterCounter platform={previewPlatform} count={content.length} />
-          <ValidationMessage validation={validation} />
+          <ValidationMessage validation={strictestValidation} />
 
           <Button
             text={
-              editing
-                ? "Update Draft"
-                : selectedPlatforms.length > 1
-                  ? `Save ${selectedPlatforms.length} Drafts`
-                  : "Save Draft"
+              saving
+                ? "Saving..."
+                : editing
+                  ? "Update Draft"
+                  : selectedPlatforms.length > 1
+                    ? `Save ${selectedPlatforms.length} Drafts`
+                    : "Save Draft"
             }
             onClick={handleSave}
+            disabled={saving || !strictestValidation.valid}
           />
         </div>
 

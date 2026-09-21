@@ -179,14 +179,13 @@ export default function DateTimePicker({ value, onChange, min }: DateTimePickerP
           position: "absolute",
           top: "calc(100% + 8px)",
           left: 0,
-          zIndex: 9999,
+          zIndex: 100000,
           background: bg,
           border: `1px solid ${border}`,
           borderRadius: "16px",
           boxShadow: dark
             ? "0 24px 64px rgba(0,0,0,0.7)"
             : "0 12px 40px rgba(15,23,42,0.15)",
-          overflow: "hidden",
           width: "340px",
           animation: "dtpFadeIn 0.18s cubic-bezier(0.16,1,0.3,1)",
         }}>

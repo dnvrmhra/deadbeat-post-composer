@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, createEntityAdapter, nanoid } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { mockApi } from '../../api/mockApi';
+import { backendApi } from '../../api/backendApi';
 
 export interface Post {
   id: string;
@@ -39,6 +40,7 @@ export interface PostsState {
   posts: ReturnType<typeof postsAdapter.getInitialState>;
   editor: EditorState;
   validation: ValidationResult;
+  loaded: boolean;
 }
 
 export const postsAdapter = createEntityAdapter<Post>();
@@ -64,29 +66,97 @@ const initialState: PostsState = {
     scheduledAt: '',
   },
   validation: { valid: true, message: '' },
+  loaded: false,
 };
 
-export const loadDrafts = createAsyncThunk('posts/loadDrafts', async () => {
-  const drafts = await mockApi.loadDrafts();
-  return drafts;
-});
+/**
+ * Load all drafts — runs only once per session (condition skips if loaded).
+ */
+export const loadDrafts = createAsyncThunk(
+  'posts/loadDrafts',
+  async () => {
+    const backendReachable = await backendApi.isReachable();
+    if (backendReachable) {
+      try {
+        const backendPosts = await backendApi.loadAll();
+        const localPosts   = await mockApi.loadDrafts();
+        // Exclude local drafts already in backend to avoid duplication
+        const backendKeys  = new Set(backendPosts.map((p) => `${p.platform}|${p.content}`));
+        const localOnly    = localPosts.filter(
+          (p) => !p.id.startsWith('api-') && !backendKeys.has(`${p.platform}|${p.content}`)
+        );
+        return [...backendPosts, ...localOnly];
+      } catch {
+        return mockApi.loadDrafts();
+      }
+    }
+    return mockApi.loadDrafts();
+  },
+  {
+    condition: (_arg, { getState }) => {
+      const state = getState() as { posts: PostsState };
+      return !state.posts.loaded;
+    },
+  }
+);
 
-export const createDraft = createAsyncThunk('posts/createDraft', async (draft: Omit<Post, 'id'>) => {
-  const newDraft: Post = { id: nanoid(), ...draft };
-  await mockApi.saveDraft(newDraft);
-  return newDraft;
-});
+/**
+ * Create a new draft.
+ * Accepts _useBackend flag so Composer can check reachability once
+ * before the multi-platform loop instead of once per platform.
+ */
+export const createDraft = createAsyncThunk(
+  'posts/createDraft',
+  async (payload: Omit<Post, 'id'> & { _useBackend?: boolean }) => {
+    const { _useBackend, ...draft } = payload;
+    if (_useBackend) {
+      try {
+        const created = await backendApi.create(draft);
+        return created;
+      } catch {
+        // Backend rejected — fall through to localStorage
+      }
+    }
+    const newDraft: Post = { id: nanoid(), ...draft };
+    await mockApi.saveDraft(newDraft);
+    return newDraft;
+  }
+);
 
+/**
+ * Update an existing draft.
+ * Routes to backend for api- prefixed IDs, localStorage for the rest.
+ */
 export const updateDraft = createAsyncThunk('posts/updateDraft', async ({ id, changes }: { id: string; changes: Partial<Post> }) => {
+  if (id.startsWith('api-')) {
+    try {
+      const updated = await backendApi.update(id, changes);
+      return updated;
+    } catch {
+      // Fall through to localStorage
+    }
+  }
   const updated = await mockApi.updateDraft(id, changes);
   if (!updated) throw new Error('Draft not found');
   return updated;
 });
 
+/**
+ * Delete a draft.
+ * Routes to backend for api- prefixed IDs, localStorage for the rest.
+ */
 export const deleteDraft = createAsyncThunk('posts/deleteDraft', async (id: string) => {
+  if (id.startsWith('api-')) {
+    try {
+      await backendApi.remove(id);
+    } catch {
+      // Backend delete failed — still remove from local state
+    }
+  }
   await mockApi.deleteDraft(id);
   return id;
 });
+
 
 const postsSlice = createSlice({
   name: 'posts',
@@ -294,6 +364,7 @@ const postsSlice = createSlice({
   extraReducers: (builder) => {
     builder.addCase(loadDrafts.fulfilled, (state, action) => {
       postsAdapter.setAll(state.posts, action.payload);
+      state.loaded = true;
     });
     builder.addCase(createDraft.fulfilled, (state, action) => {
       postsAdapter.addOne(state.posts, action.payload);
