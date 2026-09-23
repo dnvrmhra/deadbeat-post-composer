@@ -9,55 +9,58 @@ import Unauthorized from "./pages/Unauthorized";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 import RoleRoute from "./components/RoleReact";
+import { ToastProvider } from "./context/ToastContext";
 
 import "./App.css";
 
 function App() {
   return (
-    <div className="app">
-      <Navbar />
+    <ToastProvider>
+      <div className="app">
+        <Navbar />
 
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/unauthorized" element={<Unauthorized />} />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/unauthorized" element={<Unauthorized />} />
 
-        <Route
-          path="/compose"
-          element={
-            <ProtectedRoute>
-              <RoleRoute allowedRoles={["Admin", "Editor"]}>
-                <Composer />
-              </RoleRoute>
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/compose"
+            element={
+              <ProtectedRoute>
+                <RoleRoute allowedRoles={["Admin", "Editor"]}>
+                  <Composer />
+                </RoleRoute>
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/drafts"
-          element={
-            <ProtectedRoute>
-              <RoleRoute allowedRoles={["Admin", "Editor", "Viewer"]}>
-                <Drafts />
-              </RoleRoute>
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/drafts"
+            element={
+              <ProtectedRoute>
+                <RoleRoute allowedRoles={["Admin", "Editor", "Viewer"]}>
+                  <Drafts />
+                </RoleRoute>
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/calendar"
-          element={
-            <ProtectedRoute>
-              <RoleRoute allowedRoles={["Admin", "Editor", "Viewer"]}>
-                <CalendarPage />
-              </RoleRoute>
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/calendar"
+            element={
+              <ProtectedRoute>
+                <RoleRoute allowedRoles={["Admin", "Editor", "Viewer"]}>
+                  <CalendarPage />
+                </RoleRoute>
+              </ProtectedRoute>
+            }
+          />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </div>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
+    </ToastProvider>
   );
 }
 

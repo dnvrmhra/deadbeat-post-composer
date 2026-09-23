@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useState, useCallback, type ChangeEvent } from "react";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import {
   setEditorContent,
@@ -14,6 +14,7 @@ import {
 } from "../features/posts/postsSlice";
 
 import { useNavigate } from "react-router-dom";
+import { useToast } from "../context/ToastContext";
 
 import PlatformCard from "../components/PlatformCard";
 import CharacterCounter from "../components/CharacterCounter";
@@ -24,7 +25,7 @@ import DeadbeatCursor from "../components/DeadbeatCursor";
 import SocialPreview from "../components/SocialPreview";
 import DateTimePicker from "../components/DateTimePicker";
 
-import { validatePost } from "../utils/validation";
+import { validatePost, getCharacterLimit } from "../utils/validation";
 import { backendApi } from "../api/backendApi";
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -34,9 +35,45 @@ const PLATFORM_COLORS: Record<string, string> = {
   Facebook:  "#1877f2",
 };
 
+const QUICK_HASHTAGS = [
+  "#tech", "#design", "#marketing", "#social", "#creative",
+  "#updates", "#launch", "#announcement", "#trending", "#growth",
+];
+
+// ─── Progress Ring SVG ────────────────────────────────────────────────────────
+function ProgressRing({ platform, count }: { platform: string; count: number }) {
+  const limit = getCharacterLimit(platform);
+  const ratio = Math.min(count / limit, 1);
+  const r = 9;
+  const circ = 2 * Math.PI * r;
+  const dash = circ * (1 - ratio);
+  const color =
+    ratio >= 1 ? "#ef4444" : ratio >= 0.9 ? "#f59e0b" : PLATFORM_COLORS[platform];
+
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" style={{ flexShrink: 0 }}>
+      {/* Track */}
+      <circle cx="11" cy="11" r={r} fill="none" stroke="rgba(150,150,150,0.15)" strokeWidth="2" />
+      {/* Progress */}
+      <circle
+        cx="11" cy="11" r={r}
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeDasharray={circ}
+        strokeDashoffset={dash}
+        transform="rotate(-90 11 11)"
+        style={{ transition: "stroke-dashoffset 0.2s ease, stroke 0.2s ease" }}
+      />
+    </svg>
+  );
+}
+
 function Composer() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const { showToast } = useToast();
 
   useEffect(() => {
     dispatch(loadDrafts());
@@ -52,6 +89,9 @@ function Composer() {
   } = useAppSelector((state) => state.posts.editor);
 
   const [previewPlatform, setPreviewPlatform] = useState<string>(selectedPlatforms[0] || "Twitter");
+  const [saving, setSaving] = useState(false);
+  const [copyLabel, setCopyLabel] = useState("Copy");
+  const [clearConfirm, setClearConfirm] = useState(false);
 
   useEffect(() => {
     if (!selectedPlatforms.includes(previewPlatform)) {
@@ -59,10 +99,7 @@ function Composer() {
     }
   }, [selectedPlatforms, previewPlatform]);
 
-  const [saving, setSaving] = useState(false);
-
-  // Validate against the most restrictive selected platform
-  // (e.g. if Instagram is selected, image requirement always applies)
+  // Validate against most restrictive selected platform
   const strictestValidation = selectedPlatforms.reduce(
     (worst, p) => {
       const v = validatePost(p, content, images);
@@ -77,7 +114,8 @@ function Composer() {
     dispatch(toggleSelectedPlatform(p));
   }
 
-  async function handleSave(): Promise<void> {
+  // ─── Save handler ────────────────────────────────────────────────────────────
+  const handleSave = useCallback(async () => {
     if (!strictestValidation.valid || saving) return;
 
     setSaving(true);
@@ -88,7 +126,6 @@ function Composer() {
     const baseScheduledAt = scheduledAt || new Date().toISOString();
 
     try {
-      // Check backend reachability once — not once per platform
       const useBackend = await backendApi.isReachable();
 
       if (editing && editingId) {
@@ -104,6 +141,7 @@ function Composer() {
             scheduledAt: baseScheduledAt,
           },
         }));
+        showToast("Draft updated successfully!", "success");
       } else {
         for (const platform of selectedPlatforms) {
           await dispatch(createDraft({
@@ -116,22 +154,61 @@ function Composer() {
             _useBackend: useBackend,
           }));
         }
+        const msg =
+          selectedPlatforms.length > 1
+            ? `Saved ${selectedPlatforms.length} drafts successfully!`
+            : "Draft saved successfully!";
+        showToast(msg, "success");
       }
 
       dispatch(clearEditor());
-
-      navigate("/drafts", {
-        state: {
-          message: editing
-            ? "Draft updated successfully!"
-            : selectedPlatforms.length > 1
-              ? `Saved ${selectedPlatforms.length} drafts successfully!`
-              : "Draft saved successfully!",
-        },
-      });
+      navigate("/drafts");
+    } catch {
+      showToast("Something went wrong. Please try again.", "error");
     } finally {
       setSaving(false);
     }
+  }, [strictestValidation.valid, saving, scheduledAt, editing, editingId, selectedPlatforms, content, images, dispatch, navigate, showToast]);
+
+  // ─── Feature 6: Keyboard shortcuts ───────────────────────────────────────────
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Ctrl+Enter (or Cmd+Enter on Mac) → Save draft
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        handleSave();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleSave]);
+
+  // ─── Feature 3: Quick actions ─────────────────────────────────────────────────
+  function handleCopy() {
+    if (!content) return;
+    navigator.clipboard.writeText(content).then(() => {
+      setCopyLabel("Copied!");
+      showToast("Content copied to clipboard", "info");
+      setTimeout(() => setCopyLabel("Copy"), 2000);
+    });
+  }
+
+  function handleClearRequest() {
+    if (!content) return;
+    setClearConfirm(true);
+    setTimeout(() => setClearConfirm(false), 3000);
+  }
+
+  function handleClearConfirmed() {
+    dispatch(setEditorContent(""));
+    setClearConfirm(false);
+    showToast("Content cleared", "info");
+  }
+
+  function appendHashtag(tag: string) {
+    const trimmed = content.trimEnd();
+    const next = trimmed ? `${trimmed} ${tag}` : tag;
+    dispatch(setEditorContent(next));
   }
 
   return (
@@ -150,9 +227,86 @@ function Composer() {
             onToggle={handleToggle}
           />
 
+          {/* ─── Feature 3: Quick action toolbar ─── */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            marginBottom: "8px",
+            flexWrap: "wrap",
+          }}>
+            {/* Copy button */}
+            <button
+              onClick={handleCopy}
+              disabled={!content}
+              style={quickBtnStyle(!content)}
+              title="Copy content to clipboard"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              {copyLabel}
+            </button>
+
+            {/* Clear / Confirm clear */}
+            {!clearConfirm ? (
+              <button
+                onClick={handleClearRequest}
+                disabled={!content}
+                style={quickBtnStyle(!content)}
+                title="Clear all content"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                </svg>
+                Clear
+              </button>
+            ) : (
+              <button
+                onClick={handleClearConfirmed}
+                style={{ ...quickBtnStyle(false), borderColor: "#ef4444", color: "#ef4444" }}
+              >
+                Confirm clear?
+              </button>
+            )}
+
+            {/* Divider */}
+            <div style={{ width: "1px", height: "18px", background: "var(--border-dark)", margin: "0 2px" }} />
+
+            {/* Hashtag pills */}
+            {QUICK_HASHTAGS.slice(0, 6).map((tag) => (
+              <button
+                key={tag}
+                onClick={() => appendHashtag(tag)}
+                style={{
+                  padding: "3px 9px",
+                  borderRadius: "20px",
+                  border: "1px solid var(--border-dark)",
+                  background: "transparent",
+                  color: "var(--text-secondary)",
+                  fontSize: "0.72rem",
+                  fontWeight: 500,
+                  letterSpacing: "0.01em",
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "#6366f1";
+                  (e.currentTarget as HTMLButtonElement).style.color = "#6366f1";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-dark)";
+                  (e.currentTarget as HTMLButtonElement).style.color = "var(--text-secondary)";
+                }}
+                title={`Append ${tag}`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+
           <div style={{ position: "relative" }}>
             <textarea
-              placeholder="What's happening today? Type your post content..."
+              placeholder="What's happening today? Type your post content... (Ctrl+Enter to save)"
               value={content}
               onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
                 dispatch(setEditorContent(e.target.value))
@@ -207,6 +361,20 @@ function Composer() {
             onClick={handleSave}
             disabled={saving || !strictestValidation.valid}
           />
+
+          {/* Keyboard shortcut hint */}
+          <div style={{
+            textAlign: "center",
+            fontSize: "0.72rem",
+            color: "var(--text-secondary)",
+            marginTop: "8px",
+            opacity: 0.6,
+          }}>
+            Press <kbd style={{ padding: "1px 5px", borderRadius: "4px", border: "1px solid var(--border-dark)", fontSize: "0.7rem" }}>Ctrl</kbd>
+            {" + "}
+            <kbd style={{ padding: "1px 5px", borderRadius: "4px", border: "1px solid var(--border-dark)", fontSize: "0.7rem" }}>Enter</kbd>
+            {" to save"}
+          </div>
         </div>
 
         <div className="composer-preview-card">
@@ -218,26 +386,36 @@ function Composer() {
               Live Preview
             </span>
 
-            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-              {selectedPlatforms.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPreviewPlatform(p)}
-                  style={{
-                    padding: "3px 10px",
-                    borderRadius: "20px",
-                    border: `1.5px solid ${previewPlatform === p ? PLATFORM_COLORS[p] : "var(--border-dark)"}`,
-                    background: previewPlatform === p ? `${PLATFORM_COLORS[p]}18` : "transparent",
-                    color: previewPlatform === p ? PLATFORM_COLORS[p] : "var(--text-secondary)",
-                    fontSize: "0.75rem",
-                    fontWeight: 700,
-                    transition: "all 0.15s ease",
-                    letterSpacing: "0.02em",
-                  }}
-                >
-                  {p}
-                </button>
-              ))}
+            {/* ─── Feature 2: Platform tabs with progress rings ─── */}
+            <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+              {selectedPlatforms.map((p) => {
+                const limit = getCharacterLimit(p);
+                const isActive = previewPlatform === p;
+                return (
+                  <button
+                    key={p}
+                    onClick={() => setPreviewPlatform(p)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "5px",
+                      padding: "3px 8px 3px 5px",
+                      borderRadius: "20px",
+                      border: `1.5px solid ${isActive ? PLATFORM_COLORS[p] : "var(--border-dark)"}`,
+                      background: isActive ? `${PLATFORM_COLORS[p]}18` : "transparent",
+                      color: isActive ? PLATFORM_COLORS[p] : "var(--text-secondary)",
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                      transition: "all 0.15s ease",
+                      letterSpacing: "0.02em",
+                    }}
+                    title={`${content.length} / ${limit} chars`}
+                  >
+                    <ProgressRing platform={p} count={content.length} />
+                    {p}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -270,6 +448,25 @@ function Composer() {
       </div>
     </div>
   );
+}
+
+// ─── Shared quick-action button style ────────────────────────────────────────
+function quickBtnStyle(disabled: boolean): React.CSSProperties {
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: "5px",
+    padding: "3px 10px",
+    borderRadius: "6px",
+    border: "1px solid var(--border-dark)",
+    background: "transparent",
+    color: disabled ? "var(--text-secondary)" : "var(--text-primary)",
+    fontSize: "0.75rem",
+    fontWeight: 500,
+    opacity: disabled ? 0.4 : 1,
+    transition: "all 0.15s ease",
+    cursor: disabled ? "not-allowed" : "pointer",
+  };
 }
 
 export default Composer;

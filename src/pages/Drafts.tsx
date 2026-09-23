@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { selectAllPosts } from "../features/posts/selectors";
 import { loadDrafts } from "../features/posts/postsSlice";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 
 import DraftCard from "../components/DraftCard";
 import DeadbeatCursor from "../components/DeadbeatCursor";
@@ -17,6 +18,7 @@ function Drafts() {
   const dispatch = useAppDispatch();
   const location = useLocation();
   const { user } = useAuth();
+  const { showToast } = useToast();
 
   const state = location.state as LocationState | null;
             
@@ -34,8 +36,9 @@ function Drafts() {
   useEffect(() => {
     if (state?.message) {
       setMessage(state.message);
+      showToast(state.message, "success");
     }
-  }, [state]);
+  }, [state, showToast]);
 
   useEffect(() => {
     if (message) {
@@ -46,6 +49,7 @@ function Drafts() {
       return () => clearTimeout(timer);
     }
   }, [message]);
+
 
   const filteredDrafts = drafts.filter((d) => {
     if (platformFilter === "all") return true;
